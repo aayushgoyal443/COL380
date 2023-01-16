@@ -12,7 +12,7 @@ class Ranges;
 
 Data classify(Data &D, const Ranges &R, unsigned int numt);
 
-class alignas(32) Counter { // Aligned allocation per counter. Is that enough?
+class Counter { // Aligned allocation per counter. Is that enough?
 			    // Keeps per-thread subcount.
 public:
    Counter(unsigned int num=MAXTHREADS) {
@@ -63,9 +63,9 @@ struct Range { // Integer range
       hi = b;
    }
 
-   bool within(int val) const { // Return if val is within this range
-       return(lo <= val && val <= hi);
-   }
+   // bool within(int val) const { // Return if val is within this range
+   //     return(lo <= val && val <= hi);
+   // }
 
    bool strictlyin(int val) const { // Return if val is strictly inside this range
        return(lo < val && val < hi);
@@ -102,7 +102,7 @@ public:
                 return r;
        } else {
           for(int r=0; r<_num; r++) // Look through all intervals
-             if(_ranges[r].within(val))
+             if(_ranges[r].lo <= val && val <= _ranges[r].hi)
                 return r;
        }
        return BADRANGE; // Did not find any range
