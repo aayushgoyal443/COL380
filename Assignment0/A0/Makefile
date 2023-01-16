@@ -1,6 +1,6 @@
 #g++ -std=c++11 -O2 -mavx2 -c classify.cpp
 CC=g++
-CFLAGS=-std=c++11 -O2
+CFLAGS=-std=c++11 -O2 -g
 
 sources=main.cpp classify.cpp
 objects=$(sources:.cpp=.o)
