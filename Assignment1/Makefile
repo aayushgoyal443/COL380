@@ -1,21 +1,17 @@
-#g++ -std=c++11 -O2 -mavx2 -c classify.cpp
-# CC=g++
-# CFLAGS=-std=c++11 -O2 -g
+all: exec check
 
-# sources=main.cpp
-# objects=$(sources:.cpp=.o)
+exec: main.o
+	g++ -fopenmp -Wl,-rpath=. -g -o exec main.o -L/home/aayush/Desktop/COL380/Assignment1 -l:library.so
 
-# classify:$(objects)
-# 	$(CC) $(CFLAGS) -fopenmp $^ -o $@
+main.o: main.cpp library.hpp
+	g++ -fopenmp -c main.cpp
 
-# run: classify
-# 	./classify rfile dfile 1009072 4 10
+check: check.o
+	g++ -o check check.o
 
-# %.o: %.cpp classify.h
-# 	$(CC) $(CFLAGS) -fopenmp -c $<
+check.o: check.cpp
+	g++ -c check.cpp
 
-# clean:
-# 	rm *.o classify
-
-run:
-	g++ -o exec main.cpp
+.PHONY: clean
+clean:
+	rm -f *.o exec check
