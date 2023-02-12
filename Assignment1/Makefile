@@ -15,3 +15,15 @@ check.o: check.cpp
 .PHONY: clean
 clean:
 	rm -f *.o exec check
+
+run1:
+	make clean && make && ./exec input1 out1
+
+run_check1:
+	make clean && make && ./exec input1 out1 && ./check out1 output1
+
+run2:
+	make clean && make && ./exec input2 out2
+
+run_check2:
+	make clean && make && ./exec input2 out2 && ./check out2 output2

@@ -1,4 +1,5 @@
 #include <bits/stdc++.h>
+#include <omp.h>
 #include "library.hpp"
 using namespace std;
 
@@ -118,6 +119,8 @@ public:
 
     void insert(Block* block){
         pair<int,int> key = {block->i, block->j};
+        string name = to_string(key.first) + "_" + to_string(key.second);
+        #pragma omp critical (name)
         if (this->blocks.find(key) == this->blocks.end()){
             this->blocks[key] = block;
             this->k++;
@@ -226,6 +229,9 @@ int main( int argc, char** argv ){
 
     SparseMatrixOutput* result = new SparseMatrixOutput(n,m);
 
+    auto start3 = chrono::system_clock::now();
+
+    #pragma omp parallel for 
     for (Block* block1: matrix->blocks){
         for (Block* block2: matrix->blocks){
             if (block1->j == block2->i && block1->i <= block2->j){
@@ -235,6 +241,9 @@ int main( int argc, char** argv ){
         }
     }
 
+    auto stop3 = chrono::system_clock::now();
+    auto duration3 = chrono::duration_cast<chrono::nanoseconds>(stop3 - start3);
+    cout << "Multiply time: " << (1e-6)*duration3.count() << " ms" << endl;
     // result->show();
 
     // write the result to the output file
