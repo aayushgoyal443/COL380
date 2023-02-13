@@ -114,7 +114,6 @@ public:
     SparseMatrixOutput(int n, int m){
         this->n = n;
         this->m = m;
-        this->k = 0;
     }
 
     void insert(Block* block){
@@ -123,7 +122,6 @@ public:
         #pragma omp critical (name)
         if (this->blocks.find(key) == this->blocks.end()){
             this->blocks[key] = block;
-            this->k++;
         }
         else{
             this->blocks[key]->outer(block);
@@ -189,7 +187,8 @@ void read_input(SparseMatrixInput* matrix, ifstream &input){
 void write_output(SparseMatrixOutput* result, ofstream &output){
     output.write((char*)&result->n, sizeof(int));
     output.write((char*)&result->m, sizeof(int));
-    output.write((char*)&result->k, sizeof(int));
+    int k = result->blocks.size();
+    output.write((char*)&k, sizeof(int));
     for (auto it = result->blocks.begin(); it != result->blocks.end(); ++it){
         output.write((char*)&it->second->i, sizeof(int));
         output.write((char*)&it->second->j, sizeof(int));
@@ -231,7 +230,7 @@ int main( int argc, char** argv ){
 
     auto start3 = chrono::system_clock::now();
 
-    #pragma omp parallel for 
+    #pragma omp parallel for
     for (Block* block1: matrix->blocks){
         for (Block* block2: matrix->blocks){
             if (block1->j == block2->i && block1->i <= block2->j){

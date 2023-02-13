@@ -7,3 +7,6 @@
 */output2
 */check
 .gitignore
+*/report/report.*
+!*/report/report.pdf
+!*/report/report.tex
