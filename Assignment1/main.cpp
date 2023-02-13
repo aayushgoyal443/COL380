@@ -228,7 +228,7 @@ int main( int argc, char** argv ){
 
     SparseMatrixOutput* result = new SparseMatrixOutput(n,m);
 
-    auto start3 = chrono::system_clock::now();
+    // auto start3 = chrono::system_clock::now();
 
     #pragma omp parallel for
     for (Block* block1: matrix->blocks){
@@ -240,9 +240,9 @@ int main( int argc, char** argv ){
         }
     }
 
-    auto stop3 = chrono::system_clock::now();
-    auto duration3 = chrono::duration_cast<chrono::nanoseconds>(stop3 - start3);
-    cout << "Multiply time: " << (1e-6)*duration3.count() << " ms" << endl;
+    // auto stop3 = chrono::system_clock::now();
+    // auto duration3 = chrono::duration_cast<chrono::nanoseconds>(stop3 - start3);
+    // cout << "Multiply time: " << (1e-6)*duration3.count() << " ms" << endl;
     // result->show();
 
     // write the result to the output file
