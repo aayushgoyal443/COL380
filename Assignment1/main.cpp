@@ -189,7 +189,7 @@ void write_output(SparseMatrixOutput* result, ofstream &output){
     output.write((char*)&result->m, sizeof(int));
     int k = result->blocks.size();
     output.write((char*)&k, sizeof(int));
-    cout << result->n << " " << result->m << " " << k << endl;
+    // cout << result->n << " " << result->m << " " << k << endl;
     for (auto it = result->blocks.begin(); it != result->blocks.end(); ++it){
         output.write((char*)&it->second->i, sizeof(int));
         output.write((char*)&it->second->j, sizeof(int));
@@ -222,7 +222,7 @@ int main( int argc, char** argv ){
     int m = readInt(input);
     int k= readInt(input);
 
-    cout << n << " " << m << " " << k << endl;
+    // cout << n << " " << m << " " << k << endl;
 
     SparseMatrixInput* matrix  = new SparseMatrixInput(n,m,k);
     read_input(matrix, input);
@@ -251,9 +251,9 @@ int main( int argc, char** argv ){
         }
     }
 
-    auto stop3 = chrono::system_clock::now();
-    auto duration3 = chrono::duration_cast<chrono::nanoseconds>(stop3 - start3);
-    cout << "Multiply time: " << (1e-6)*duration3.count() << " ms" << endl;
+    // auto stop3 = chrono::system_clock::now();
+    // auto duration3 = chrono::duration_cast<chrono::nanoseconds>(stop3 - start3);
+    // cout << "Multiply time: " << (1e-6)*duration3.count() << " ms" << endl;
     // result->show();
 
     // write the result to the output file
