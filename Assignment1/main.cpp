@@ -230,12 +230,20 @@ int main( int argc, char** argv ){
 
     // auto start3 = chrono::system_clock::now();
 
-    #pragma omp parallel for
-    for (Block* block1: matrix->blocks){
-        for (Block* block2: matrix->blocks){
-            if (block1->j == block2->i && block1->i <= block2->j){
-                Block* block3 = block1->inner(block2);
-                result->insert(block3);
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            for (Block* block1: matrix->blocks){
+                #pragma omp task
+                {
+                    for (Block* block2: matrix->blocks){
+                        if (block1->j == block2->i && block1->i <= block2->j){
+                            Block* block3 = block1->inner(block2);
+                            result->insert(block3);
+                        }
+                    }
+                }
             }
         }
     }
