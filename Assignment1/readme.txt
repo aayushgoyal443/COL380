@@ -39,5 +39,15 @@ Another drawback could be I am not using the O(n^(log_sub{2}_sup{7})) algorithm 
 
 
 Final scalablitity Analysis:
+--------------------------------------------------------------------------
+|  k_input  |   k_output |    2 cores    |    4 cores    |    8 cores    |
+--------------------------------------------------------------------------
+|  2**10    |   2131     |   256.932ms   |   163.714ms   |   152.538ms   |
+|  2**15    |   426270   |   112.263s    |    51.159s    |    31.028s    |
+--------------------------------------------------------------------------
 
+Note: I could only perform the scalablitity analysis upto 2**15, for bigger test cases the code will not work on my machine and currently css is also not working. Also my laptop has only 8CPUs and hence there is no point of analyzinf for more than 8 threads.
+Number of threads was changed by writing OMP_NUM_THREADS=2,4,8 in the terminal before ./exec
 
+Analysis:
+We can see that for larger values of k the runtime is getting half every time we are doubling the number of threads. Hence the multi tasking is working better. For smaller input values, however there is not much significant change when we are trying to increase the threads, this is becasue the overhead of creating, scheduling and managing the threads is also becoming significant in this case.

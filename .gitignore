@@ -10,3 +10,4 @@
 */report/report.*
 !*/report/report.pdf
 !*/report/report.tex
+*/testcases/*
