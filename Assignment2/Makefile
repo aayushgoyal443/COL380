@@ -7,4 +7,4 @@ run:
 
 compile_sample:
 	mpic++ -std=c++17 -o sample sample.cpp
-	mpirun -np 1 ./sample
+	mpirun -np 4 ./sample
