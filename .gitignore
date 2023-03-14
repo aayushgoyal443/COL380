@@ -11,3 +11,8 @@
 !*/report/report.pdf
 !*/report/report.tex
 */testcases/*
+Assignment2/test_cases/A2/*
+Assignment2/a2
+Assignment2/hello.txt
+Assignment2/.vscode/c_cpp_properties.json
+Assignment2/.vscode/settings.json
