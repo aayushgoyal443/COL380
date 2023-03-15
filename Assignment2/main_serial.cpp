@@ -321,7 +321,7 @@ int main( int argc, char** argv ){
 
         for (auto edge: to_settle){
             settled.insert(edge);
-            int u = edge.first;
+	    int u = edge.first;
             int v = edge.second;
             for (auto &triangle: edgeList[edge].triangles){
                 int w = triangle.first;
@@ -345,20 +345,11 @@ int main( int argc, char** argv ){
                 }
                 bool settled_uu_ww = settled.count(make_pair(uu,ww));   
                 bool settled_vvv_www = settled.count(make_pair(vvv,www));
-                bool to_settle_uu_ww = to_settle.count(make_pair(uu,ww));
-                bool to_settle_vvv_www = to_settle.count(make_pair(vvv,www));
 
-                if (!settled_uu_ww && !to_settle_uu_ww && !settled_vvv_www && !to_settle_vvv_www){
+                if (!settled_uu_ww && !settled_vvv_www){
                     if (edgeList[make_pair(uu,ww)].truss_number > min_truss) edgeList[make_pair(uu,ww)].truss_number-=1;
                     if (edgeList[make_pair(vvv,www)].truss_number > min_truss)edgeList[make_pair(vvv,www)].truss_number-=1;
                 }
-                else if (!settled_uu_ww && !to_settle_uu_ww && !settled_vvv_www && to_settle_vvv_www){
-                    if (edgeList[make_pair(uu,ww)].truss_number > min_truss) edgeList[make_pair(uu,ww)].truss_number-=1;
-                }
-                else if (!settled_vvv_www && !to_settle_vvv_www && !settled_uu_ww && to_settle_uu_ww){
-                    if (edgeList[make_pair(vvv,www)].truss_number > min_truss) edgeList[make_pair(vvv,www)].truss_number-=1;
-                }
-
             }
         }
     }
