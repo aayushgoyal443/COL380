@@ -6,14 +6,10 @@ using namespace std;
 
 class EdgeData{
 public:
-    int u;
-    int v;
     // we are going to assume u is the smaller one
     int sup;
     int truss_number;
-    int g;
     vector<pair<int,int>> triangles;
-    vector<int> histogram;
 };
 
 
@@ -86,8 +82,6 @@ struct EdgeQuery{
 void insertTriangle(int u, int v, int w, map<pair<int, int>, EdgeData>& edgeList){
     if (edgeList.find(make_pair(u, v)) == edgeList.end()){
         edgeList[make_pair(u, v)] = EdgeData();
-        edgeList[make_pair(u, v)].u = u;
-        edgeList[make_pair(u, v)].v = v;
         edgeList[make_pair(u, v)].sup = 1;
         edgeList[make_pair(u, v)].triangles.push_back({w, INT_MAX});
     }
@@ -358,7 +352,6 @@ int main( int argc, char** argv ){
     for(int i=0; i<size; i++){
         for(int j=0; j<recvCounts[i]; j++){
             Query q = recvBuffer[recvOffsets[i] + j];
-            // cout << "Node num: "<< q.v << " | Node id: "  << nodes[q.v].id  <<" | rank: " << rank << " | owner: " <<  nodes[q.v].owner<<"\n";
             if (nodes[q.v].adjlist.find(q.w) != nodes[q.v].adjlist.end()){
                 sendBuffer2[recvOffsets[i] + j] = '1';
                 insertTriangle(q.v, q.w, q.u, edgeList);   
@@ -386,15 +379,20 @@ int main( int argc, char** argv ){
     }
 
     // TODO: Now start the minTruss algorithm
+    for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
+        it->second.truss_number = it->second.sup+2;
+    }
+
 
     int edge_list_count = edgeList.size();
     MPI_Allreduce(MPI_IN_PLACE, &edge_list_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
     set<pair<int, int>> settled;
+    int iter = 0;
     while(true){
+        iter++;
         int count = settled.size();
         MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
         if (count == edge_list_count){
             break;
         }
@@ -409,144 +407,154 @@ int main( int argc, char** argv ){
         }
         MPI_Allreduce(MPI_IN_PLACE, &min_truss, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
 
-        set<pair<int,int>> to_settle;
+        vector<pair<int,int>> to_settle;
         for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
             if ( settled.count(it->first)==0 && edgeList[it->first].truss_number == min_truss){
-                to_settle.insert(it->first);
+                to_settle.push_back(it->first);
             }
         }
-
         int to_settle_count = to_settle.size();
         int global_to_settle_count=INT_MIN;
         MPI_Allreduce(&to_settle_count, &global_to_settle_count, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-
-        auto it = to_settle.begin();
+        
         for (int i=0;i<global_to_settle_count;i++){
-            pair<int,int> edge;
+            pair<int,int> edge = {-1,-1};
             int u,v;
-            int triangles_size=0;
-            if (it!=to_settle.end()){
-                edge = *it;
-                it++;
+            vector<vector<EdgeQuery>> sendEdgeQuery(size);
+            
+            if (i < to_settle_count){
+                edge = to_settle[i];
                 settled.insert(edge);
                 u = edge.first;
                 v = edge.second;
-                triangles_size = edgeList[edge].triangles.size();
-            }
-            int global_triangles_size=INT_MIN;
-            MPI_Allreduce(&triangles_size, &global_triangles_size, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-            for (int j=0;j<global_triangles_size;j++){
-                
-                vector<vector<EdgeQuery>> sendEdgeQuery(size);
+                for (auto& triangle: edgeList[edge].triangles){
 
-                if (triangles_size>0){
-                    triangles_size--;
-                    int w = edgeList[edge].triangles[j].first;
-                    int uu, ww;
-                    int vvv, www;
+                    int w = triangle.first;
+                    int uu=u, ww=w;
+                    int vvv=v, www=w;
                     if (nodes[w] < nodes[u]){
                         uu = w;
                         ww = u;
-                    }
-                    else{
-                        uu = u;
-                        ww = w;
                     }
                     if (nodes[w] < nodes[v]){
                         vvv = w;
                         www = v;
                     }
-                    else{
-                        vvv = v;
-                        www = w;
-                    }
                     int owner_uu = nodes[uu].owner;
                     int owner_vvv = nodes[vvv].owner;
 
-                    if (owner_uu != rank) sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, (owner_vvv== rank)? settled.count(make_pair(vvv,www)) : 0 ));
+                    if (owner_uu == rank && owner_vvv == rank ){
+                        bool settled_uu_ww = settled.count(make_pair(uu,ww));   
+                        bool settled_vvv_www = settled.count(make_pair(vvv,www));
+                        
+                        if (!settled_uu_ww && !settled_vvv_www){
+                            if (edgeList[make_pair(uu,ww)].truss_number > min_truss) edgeList[make_pair(uu,ww)].truss_number-=1;
+                            if (edgeList[make_pair(vvv,www)].truss_number > min_truss)edgeList[make_pair(vvv,www)].truss_number-=1;
+                        }                   
+                    }
 
+                    if (owner_uu != rank) sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, (owner_vvv== rank)? settled.count(make_pair(vvv,www)) : 0 ));
                     if (owner_vvv != rank) sendEdgeQuery[owner_vvv].push_back(EdgeQuery({vvv,www},{uu,ww}, (owner_uu== rank)? settled.count(make_pair(uu,ww)) : 0 ));
 
-
-                    // if (owner_uu == rank && owner_vvv == rank ){
-                    //     bool settled_uu_ww = settled.count(make_pair(uu,ww));   
-                    //     bool settled_vvv_www = settled.count(make_pair(vvv,www));
-                    //     bool to_settle_uu_ww = to_settle.count(make_pair(uu,ww));
-                    //     bool to_settle_vvv_www = to_settle.count(make_pair(vvv,www));
-                        
-                    //     if (settled_uu_ww or settled_vvv_www) continue; 
-                    //     if (!to_settle_uu_ww){
-                    //         if (edgeList[make_pair(uu,ww)].truss_number > min_truss) edgeList[make_pair(uu,ww)].truss_number-=1;
-                    //     }
-                    //     if (!to_settle_vvv_www){
-                    //         if (edgeList[make_pair(vvv,www)].truss_number > min_truss) edgeList[make_pair(vvv,www)].truss_number-=1;
-                    //     }                     
-                    // }
                 }
+            }
 
-                // now send the queries to the other processors
-                int* sendCounts = new int[size];
-                int* sendOffsets = new int[size];
-                int* recvCounts = new int[size];
-                int* recvOffsets = new int[size];
+            // now send the sendEdgeQuery to the appropriate processors
+            int* sendCounts = new int[size];
+            int* sendOffsets = new int[size];
+            int* recvCounts = new int[size];
+            int* recvOffsets = new int[size];
+            for(int i = 0; i < size; i++){
+                sendCounts[i] = sendEdgeQuery[i].size();
+                sendOffsets[i] = 0;
+                recvCounts[i] = 0;
+                recvOffsets[i] = 0;
+            }
+            MPI_Alltoall(sendCounts, 1, MPI_INT, recvCounts, 1, MPI_INT, MPI_COMM_WORLD);
+            for(int i = 1; i < size; i++){
+                sendOffsets[i] = sendOffsets[i-1] + sendCounts[i-1];
+                recvOffsets[i] = recvOffsets[i-1] + recvCounts[i-1];
+            }
+            int totalSend = sendOffsets[size-1] + sendCounts[size-1];
+            int totalRecv = recvOffsets[size-1] + recvCounts[size-1];
 
-                for (int i=0;i<size;i++){
-                    sendCounts[i] = sendEdgeQuery[i].size();
-                    sendOffsets[i] = 0;
-                    recvCounts[i] = 0;
-                    recvOffsets[i] = 0;
+            EdgeQuery* sendBuffer = new EdgeQuery[totalSend];
+            EdgeQuery* recvBuffer = new EdgeQuery[totalRecv];
+
+            for(int i = 0; i < size; i++){
+                for(int j = 0; j < sendCounts[i]; j++){
+                    sendBuffer[sendOffsets[i] + j] = sendEdgeQuery[i][j];
                 }
+            }
 
-                MPI_Alltoall(sendCounts, 1, MPI_INT, recvCounts, 1, MPI_INT, MPI_COMM_WORLD);
+            // multiply by counts and offsets by sizeof
+            for (int i = 0; i < size; i++){
+                sendCounts[i] *= sizeof(EdgeQuery);
+                sendOffsets[i] *= sizeof(EdgeQuery);
+                recvCounts[i] *= sizeof(EdgeQuery);
+                recvOffsets[i] *= sizeof(EdgeQuery);
+            }
 
-                for (int i=1;i<size;i++){
-                    sendOffsets[i] = sendOffsets[i-1] + sendCounts[i-1];
-                    recvOffsets[i] = recvOffsets[i-1] + recvCounts[i-1];
+            MPI_Alltoallv(sendBuffer, sendCounts, sendOffsets, MPI_BYTE, recvBuffer, recvCounts, recvOffsets, MPI_BYTE, MPI_COMM_WORLD);
+
+            // now divide by the size 
+            for (int i = 0; i < size; i++){
+                sendCounts[i] /= sizeof(EdgeQuery);
+                sendOffsets[i] /= sizeof(EdgeQuery);
+                recvCounts[i] /= sizeof(EdgeQuery);
+                recvOffsets[i] /= sizeof(EdgeQuery);
+            }
+
+            int* sendResponseBuffer = new int[totalRecv];
+            int* recvResponseBuffer = new int[totalSend];
+
+            for(int i = 0; i < size; i++){
+                for(int j = 0; j < recvCounts[i]; j++){
+                    EdgeQuery q = recvBuffer[recvOffsets[i] + j];
+                    int u = q.edge_to_change.first;
+                    int w = q.edge_to_change.second;
+                    int vv = q.other_edge.first;
+                    int ww = q.other_edge.second;
+                    int other_owner = nodes[vv].owner;
+                    int other_settled = q.settled;
+                    if (other_owner == rank){
+                        other_settled = settled.count(make_pair(vv,ww));
+                    }
+                    int settled_me  = settled.count(make_pair(u,w));
+                    if (!other_settled && !settled_me){
+                        if (edgeList[{u,w}].truss_number > min_truss) edgeList[{u,w}].truss_number-=1;
+                    }
+                    sendResponseBuffer[recvOffsets[i] + j] = settled_me;
                 }
+            }
 
-                int totalSend = sendOffsets[size-1] + sendCounts[size-1];
-                int totalRecv = recvOffsets[size-1] + recvCounts[size-1];
+            MPI_Alltoallv(sendResponseBuffer, recvCounts, recvOffsets, MPI_INT, recvResponseBuffer, sendCounts, sendOffsets, MPI_INT, MPI_COMM_WORLD);
 
-                EdgeQuery* sendBuffer = new EdgeQuery[totalSend];
-                EdgeQuery* recvBuffer = new EdgeQuery[totalRecv];
-
-                for (int i=0;i<size;i++){
-                    for (int j=0;j<sendEdgeQuery[i].size();j++){
-                        sendBuffer[sendOffsets[i]+j] = sendEdgeQuery[i][j];
+            // now use thne recvResponseBuffer to update the other_edge in the sendEdgeQuery
+            for(int i = 0; i < size; i++){
+                for(int j = 0; j < sendCounts[i]; j++){
+                    EdgeQuery q = sendEdgeQuery[i][j];
+                    int u = q.other_edge.first;
+                    if (nodes[u].owner != rank) continue;
+                    int w = q.other_edge.second;
+                    int vv  = q.edge_to_change.first;
+                    int ww = q.edge_to_change.second;
+                    int other_settled = recvResponseBuffer[sendOffsets[i] + j];
+                    int settled_me  = settled.count(make_pair(u,w));
+                    if (!other_settled && !settled_me){
+                        if (edgeList[{u,w}].truss_number > min_truss) edgeList[{u,w}].truss_number-=1;
                     }
                 }
-
-                // multiply counts and offsets by sizeof
-                for (int i=0;i<size;i++){
-                    sendCounts[i] *= sizeof(EdgeQuery);
-                    sendOffsets[i] *= sizeof(EdgeQuery);
-                    recvCounts[i] *= sizeof(EdgeQuery);
-                    recvOffsets[i] *= sizeof(EdgeQuery);
-                }
-
-                MPI_Alltoallv(sendBuffer, sendCounts, sendOffsets, MPI_BYTE, recvBuffer, recvCounts, recvOffsets, MPI_BYTE, MPI_COMM_WORLD);
-
-                // now divide counts and offsets by sizeof
-                for (int i=0;i<size;i++){
-                    sendCounts[i] /= sizeof(EdgeQuery);
-                    sendOffsets[i] /= sizeof(EdgeQuery);
-                    recvCounts[i] /= sizeof(EdgeQuery);
-                    recvOffsets[i] /= sizeof(EdgeQuery);
-                }
-
-                // now process the received queries
-
-
-
-
-
-
             }
+
         }
 
+    }
 
-
+    // print the truss number of each edge
+    for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
+        cout << it->first.first << " " << it->first.second << " " << it->second.truss_number << endl;
     }
     
     
