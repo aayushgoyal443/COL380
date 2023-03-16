@@ -4,6 +4,16 @@
 using namespace std;
 
 
+struct hashFunction
+{
+  size_t operator()(const pair<int , 
+                    int> &x) const
+  {
+    return x.first ^ x.second;
+  }
+};
+
+
 class EdgeData{
 public:
     // we are going to assume u is the smaller one
@@ -64,17 +74,20 @@ struct EdgeQuery{
     pair<int, int> edge_to_change;
     pair<int, int> other_edge;
     int settled;
+    int tag;
 
     //add default constructor
     EdgeQuery(){
         this->edge_to_change = make_pair(-1, -1);
         this->other_edge = make_pair(-1, -1);
         this->settled = -1;
+        this->tag = -1;
     }
-    EdgeQuery(pair<int, int> a, pair<int, int> b, int c){
+    EdgeQuery(pair<int, int> a, pair<int, int> b, int c, int d){
         this->edge_to_change = a;
         this->other_edge = b;
         this->settled = c;
+        this->tag = d;
     }
 };
 
@@ -92,90 +105,140 @@ void insertTriangle(int u, int v, int w, map<pair<int, int>, EdgeData>& edgeList
 }
 
 
+vector<int> print_connected_components(int source, int rank, int size, vector<Node> &nodes, vector<int>& visited, vector<pair<int,int>>& trusslist_k)
+{   
+    // using the trusslist make adj list 
+    vector<vector<int>> adjlist(nodes.size());
+    vector<vector<pair<int, int>>> sendTrussList(size);
+    for (auto p : trusslist_k){
+        adjlist[p.first].push_back(p.second);
+        int other_owner = nodes[p.second].owner;
+        if (other_owner != rank){
+            sendTrussList[other_owner].push_back({p.second, p.first});
+        }
+        else{
+            adjlist[p.second].push_back(p.first);
+        }
+    }
+    vector<int> sendCounts(size, 0);
+    vector<int> recvCounts(size, 0);
+    vector<int> sendOffsets(size, 0);
+    vector<int> recvOffsets(size, 0);
+    for (int i=0; i<size; i++)
+    {
+        sendCounts[i] = sendTrussList[i].size();
+    }
+    MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    for (int i=0; i<size; i++)
+    {
+        sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
+        recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
+    }
+    vector<pair<int, int>> sendTrussListBuffer(sendOffsets[size-1] + sendCounts[size-1]);
+    vector<pair<int, int>> recvTrussListBuffer(recvOffsets[size-1] + recvCounts[size-1]);
 
-// void print_connected_components(int source, int rank, int size, vector<Node> &nodes, map<pair<int, int>, EdgeData>& edgeList, vector<vector<TriangleQuery>>& sendQueries, vector<vector<TriangleQuery>>& recvQueries, vector<vector<pair<int,int>>> &buckets, vector<pair<int, int>> & active_set, int k_max, int gamma_max, int &gamma_active, pair<int,int> & window, set<pair<int,int> > &changed_edges, vector<int> &trussness, vector<int> &trussness_new, vector<int> &trussness_old, vector<int> &trussness_old2, vector<int> &trussness_old3, vector<int> &trussness_old4, vector<int> &trussness_old5, vector<int> &trussness_old6, vector<int> &trussness_old7, vector<int> &trussness_old8, vector<int> &trussness_old9, vector<int> &trussness_old10, vector<int> &trussness_old11, vector<int> &trussness_old12, vector<int> &trussness_old13, vector<int> &trussness_old14, vector<int> &trussness_old15, vector<int> &trussness_old16, vector<int> &trussness_old17, vector<int> &trussness_old18, vector<int> &trussness_old19, vector<int> &trussness_old20, vector<int> &trussness_old21, vector<int> &trussness_old22, vector<int> &trussness_old23, vector<int> &trussness_old24, vector<int> &trussness_old25, vector<int> &trussness_old26, vector<int> &trussness_old27, vector<int> &trussness_old28, vector<int> &trussness_old29, vector<int> &trussness_old30, vector<int> &trussness_old31, vector<int> &trussness_old32, vector<int> &trussness_old33, vector<int> &trussness_old34, vector<int> &trussness_old35, vector<int> &trussness_old36, vector<int> &trussness_old37, vector<int> &trussness_old38, vector<int> &trussness_old39, vector<int>)
-// {   
-//     vector<int> frontier, next_frontier;
-//     vector<int> visited(nodes.size(), 0);
-//     int owner = nodes[source].owner;
-//     if (owner == rank)
-//     {
-//         frontier.push_back(source);
-//         visited[source] = 1;
-//     }
-//     while (true)
-//     {
-//         next_frontier.clear();
-//         vector<vector<int>> sendUpdates(size);
-//         vector<vector<int>> recvUpdates(size);
-//         vector<int> sendCounts(size, 0);
-//         vector<int> recvCounts(size, 0);
-//         vector<int> sendOffsets(size, 0);
-//         vector<int> recvOffsets(size, 0);
-        
-//         for (int i=0; i<frontier.size(); i++)
-//         {
-//             int cur = frontier[i];
-//             for(auto u: nodes[cur].adj)
-//             {
-//                 if (visited[u] == 0)
-//                 {
-//                     int owner = nodes[u].owner;
-//                     if (owner == rank)
-//                     {
-//                         next_frontier.push_back(u);
-//                         visited[u] = 1;
-//                     }
-//                     else{
-//                         sendUpdates[owner].push_back(u);
-//                         sendCounts[owner]++;
-//                     }
-//                 }
-//             }
-            
-//         }
-//         MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-//         for (int i=0; i<size; i++)
-//         {
-//             sendOffsets[i] = (i==0)?0:(sendOffsets[i-1] + sendCounts[i-1]);
-//             recvOffsets[i] = (i==0)?0:(recvOffsets[i-1] + recvCounts[i-1]);
-//         }
+    for (int i=0; i<size; i++)
+    {
+        for (int j=0; j<sendCounts[i]; j++)
+        {
+            sendTrussListBuffer[sendOffsets[i] + j] = sendTrussList[i][j];
+        }
+    }
 
-//         for (int i=0; i<size; i++)
-//         {
-//             sendCounts[i] *= sizeof(int);
-//             recvCounts[i] *= sizeof(int);
-//             sendOffsets[i] *= sizeof(int);
-//             recvOffsets[i] *= sizeof(int);
-//         }
-//         vector<int> sendBuffer(sendOffsets[size-1] + sendCounts[size-1]);
-//         vector<int> recvBuffer(recvOffsets[size-1] + recvCounts[size-1]);
-//         for (int i=0; i<size; i++)
-//         {
-//             memcpy(sendBuffer.data() + sendOffsets[i], sendUpdates[i].data(), sendCounts[i]);
-//         }
+    for (int i = 0; i < size; i++)
+    {
+        sendCounts[i] *= 2;
+        recvCounts[i] *= 2;
+        sendOffsets[i] *= 2;
+        recvOffsets[i] *= 2;
+    }
 
-//         MPI_Alltoallv(sendBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_BYTE, recvBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
-//         for (int i=0; i<size; i++)
-//         {
-//             for (int j=0; j<recvCounts[i]/sizeof(int); j++)
-//             {
-//                 int u = recvBuffer[recvOffsets[i]/sizeof(int) + j];
-//                 if (visited[u] == 0)
-//                 {
-//                     next_frontier.push_back(u);
-//                     visited[u] = 1;
-//                 }
-//             }
-//         }
-//         frontier = next_frontier;
-//         int fsize = frontier.size();
-//         int global_fsize = 0;
-//         MPI_Allreduce(&global_fsize, &fsize, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-//         if (global_fsize == 0) break;
-//     }
 
-// }
+    MPI_Alltoallv(sendTrussListBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvTrussListBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
+
+    for (int i=0; i<recvTrussListBuffer.size(); i++)
+    {
+        adjlist[recvTrussListBuffer[i].first].push_back(recvTrussListBuffer[i].second);
+    }
+
+    vector<int> component;
+    vector<int> frontier, next_frontier;
+    int owner = nodes[source].owner;
+    if (owner == rank)
+    {
+        frontier.push_back(source);
+        visited[source] = 1;
+        component.push_back(source);
+    }
+    while (true)
+    {
+        next_frontier.clear();
+        vector<vector<int>> sendUpdates(size);
+        vector<vector<int>> recvUpdates(size);
+        vector<int> sendCounts(size, 0);
+        vector<int> recvCounts(size, 0);
+        vector<int> sendOffsets(size, 0);
+        vector<int> recvOffsets(size, 0);
+
+        for (int i=0; i<frontier.size(); i++)
+        {
+            int cur = frontier[i];
+            for(auto u: adjlist[cur])
+            {
+                if (visited[u] == 0)
+                {
+                    int owner = nodes[u].owner;
+                    if (owner == rank)
+                    {
+                        next_frontier.push_back(u);
+                        visited[u] = 1;
+                        component.push_back(u);
+                    }
+                    else{
+                        sendUpdates[owner].push_back(u);
+                        sendCounts[owner]++;
+                    }
+                }
+            }
+        }
+
+        MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+        for (int i=0; i<size; i++)
+        {
+            sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
+            recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
+        }
+        vector<int> sendBuffer(sendOffsets[size-1] + sendCounts[size-1]);
+        vector<int> recvBuffer(recvOffsets[size-1] + recvCounts[size-1]);
+        for (int i=0; i<size; i++)
+        {
+            for (int j=0; j<sendCounts[i]; j++)
+            {
+                sendBuffer[sendOffsets[i] + j] = sendUpdates[i][j];
+            }
+        }
+        MPI_Alltoallv(sendBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
+        for (int i=0; i<size; i++)
+        {
+            for (int j=0; j<recvCounts[i]; j++)
+            {
+                int u = recvBuffer[recvOffsets[i] + j];
+                if (visited[u] == 0)
+                {
+                    next_frontier.push_back(u);
+                    visited[u] = 1;
+                    component.push_back(u);
+                }
+            }
+        }
+        frontier = next_frontier;
+        int fsize = frontier.size();
+        int global_fsize = 0;
+        MPI_Allreduce(&fsize, &global_fsize, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        if (global_fsize == 0) break;
+    }
+    return component;
+}
 
 
 int main( int argc, char** argv ){
@@ -290,7 +353,9 @@ int main( int argc, char** argv ){
             }
         }
     }
-
+    // cout << "owner of 4492 is " << nodes[4492].owner << endl;
+    // cout << "owner of 4490 is " << nodes[4492].owner << endl;
+    
     // u we need to find out how many queries we are going to send to each processor
     int* sendCounts = new int[size];
     int* sendOffsets = new int[size];
@@ -378,16 +443,14 @@ int main( int argc, char** argv ){
         }
     }
 
-    // TODO: Now start the minTruss algorithm
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
         it->second.truss_number = it->second.sup+2;
     }
 
-
     int edge_list_count = edgeList.size();
     MPI_Allreduce(MPI_IN_PLACE, &edge_list_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-    set<pair<int, int>> settled;
+    unordered_set<pair<int, int>, hashFunction> settled;
     int iter = 0;
     while(true){
         iter++;
@@ -406,24 +469,25 @@ int main( int argc, char** argv ){
             }
         }
         MPI_Allreduce(MPI_IN_PLACE, &min_truss, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+        set<pair<int,int>> to_settle;
 
-        vector<pair<int,int>> to_settle;
         for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
             if ( settled.count(it->first)==0 && edgeList[it->first].truss_number == min_truss){
-                to_settle.push_back(it->first);
+                to_settle.insert(it->first);
             }
         }
         int to_settle_count = to_settle.size();
         int global_to_settle_count=INT_MIN;
         MPI_Allreduce(&to_settle_count, &global_to_settle_count, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-        
+        auto it = to_settle.begin();
         for (int i=0;i<global_to_settle_count;i++){
             pair<int,int> edge = {-1,-1};
             int u,v;
             vector<vector<EdgeQuery>> sendEdgeQuery(size);
             
-            if (i < to_settle_count){
-                edge = to_settle[i];
+            if (it != to_settle.end()){
+                edge = *it;
+                it++;
                 settled.insert(edge);
                 u = edge.first;
                 v = edge.second;
@@ -447,18 +511,23 @@ int main( int argc, char** argv ){
                     if (owner_uu == rank && owner_vvv == rank ){
                         bool settled_uu_ww = settled.count(make_pair(uu,ww));   
                         bool settled_vvv_www = settled.count(make_pair(vvv,www));
-                        
                         if (!settled_uu_ww && !settled_vvv_www){
                             if (edgeList[make_pair(uu,ww)].truss_number > min_truss) edgeList[make_pair(uu,ww)].truss_number-=1;
-                            if (edgeList[make_pair(vvv,www)].truss_number > min_truss)edgeList[make_pair(vvv,www)].truss_number-=1;
+                            if (edgeList[make_pair(vvv,www)].truss_number > min_truss) edgeList[make_pair(vvv,www)].truss_number-=1;
                         }                   
                     }
-
-                    if (owner_uu != rank) sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, (owner_vvv== rank)? settled.count(make_pair(vvv,www)) : 0 ));
-                    if (owner_vvv != rank) sendEdgeQuery[owner_vvv].push_back(EdgeQuery({vvv,www},{uu,ww}, (owner_uu== rank)? settled.count(make_pair(uu,ww)) : 0 ));
+                    else if (owner_uu != rank && owner_vvv != rank){
+                        sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, 0, true ));
+                    }
+                    else if (owner_uu != rank) sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, (owner_vvv== rank)? settled.count(make_pair(vvv,www)) : 1 ,  false ));
+                    else if (owner_vvv != rank) sendEdgeQuery[owner_vvv].push_back(EdgeQuery({vvv,www},{uu,ww}, (owner_uu== rank)? settled.count(make_pair(uu,ww)) : 1, false ));
 
                 }
             }
+            
+            vector<pair<int,int>> send_main_edge(size, {u,v});
+            vector<pair<int,int>> recv_main_edge(size);
+            MPI_Alltoall( send_main_edge.data() , sizeof(pair<int,int>), MPI_BYTE, recv_main_edge.data(), sizeof(pair<int,int>), MPI_BYTE, MPI_COMM_WORLD);
 
             // now send the sendEdgeQuery to the appropriate processors
             int* sendCounts = new int[size];
@@ -508,24 +577,31 @@ int main( int argc, char** argv ){
 
             int* sendResponseBuffer = new int[totalRecv];
             int* recvResponseBuffer = new int[totalSend];
-
             for(int i = 0; i < size; i++){
                 for(int j = 0; j < recvCounts[i]; j++){
                     EdgeQuery q = recvBuffer[recvOffsets[i] + j];
-                    int u = q.edge_to_change.first;
+                    int uu = q.edge_to_change.first;
                     int w = q.edge_to_change.second;
                     int vv = q.other_edge.first;
                     int ww = q.other_edge.second;
                     int other_owner = nodes[vv].owner;
                     int other_settled = q.settled;
+                    int tag  = q.tag;
                     if (other_owner == rank){
                         other_settled = settled.count(make_pair(vv,ww));
                     }
-                    int settled_me  = settled.count(make_pair(u,w));
+                    int settled_me  = settled.count(make_pair(uu,w));
+                    
                     if (!other_settled && !settled_me){
-                        if (edgeList[{u,w}].truss_number > min_truss) edgeList[{u,w}].truss_number-=1;
+                        if (edgeList[{uu,w}].truss_number > min_truss) edgeList[{uu,w}].truss_number-=1;
+                        if (tag && edgeList[{vv,ww}].truss_number > min_truss) edgeList[{vv,ww}].truss_number-=1;
                     }
                     sendResponseBuffer[recvOffsets[i] + j] = settled_me;
+                    // if (u == uu && v == w && !lied ) 
+                    // {      
+                    //     lied = true;                
+                    //     sendResponseBuffer[recvOffsets[i] + j] = false;
+                    // }
                 }
             }
 
@@ -537,10 +613,16 @@ int main( int argc, char** argv ){
                     EdgeQuery q = sendEdgeQuery[i][j];
                     int u = q.other_edge.first;
                     if (nodes[u].owner != rank) continue;
+                    
                     int w = q.other_edge.second;
                     int vv  = q.edge_to_change.first;
                     int ww = q.edge_to_change.second;
+                    if (nodes[vv].owner == rank) continue;
+                    int other_owner = nodes[vv].owner;
                     int other_settled = recvResponseBuffer[sendOffsets[i] + j];
+                    if (recv_main_edge[other_owner].first == vv && recv_main_edge[other_owner].second == ww){
+                        other_settled = false;
+                    }
                     int settled_me  = settled.count(make_pair(u,w));
                     if (!other_settled && !settled_me){
                         if (edgeList[{u,w}].truss_number > min_truss) edgeList[{u,w}].truss_number-=1;
@@ -552,120 +634,87 @@ int main( int argc, char** argv ){
 
     }
 
-    // print the truss number of each edge
+    // // print the truss number of each edge
+    // for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
+    //     cout << it->first.first << " " << it->first.second << " " << it->second.truss_number << endl;
+    // }
+    
+    // TODO: Now we just need to print the components directly
+    // now make a trussList using the edgeList 
+    vector<tuple<int,int,int>> trussList;
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-        cout << it->first.first << " " << it->first.second << " " << it->second.truss_number << endl;
+        trussList.push_back(make_tuple(it->first.first, it->first.second, it->second.truss_number));
     }
     
-    
-    // now make a trussList using the edgeList 
-    // vector<tuple<int,int,int>> trussList;
-    // for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-    //     trussList.push_back(make_tuple(it->first.first, it->first.second, it->second.truss_number));
-    // }
+    for (int k = k_minimum; k <= k_maximum; k++){
+        int exists = 0;
+        for (auto it = trussList.begin(); it!= trussList.end(); it++){
+            if (get<2>(*it) >= k+2){
+                exists = true;
+                break;
+            }
+        }
+        MPI_Allreduce(MPI_IN_PLACE, &exists, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+        vector<vector<int>> connectedComponents;
+        if (exists){
+            // find all the edges with truss number >= k+2
+            vector<pair<int,int>> trussList_k;
+            for (auto it = trussList.begin(); it!= trussList.end(); it++){
+                if (get<2>(*it) >= k+2){
+                    trussList_k.push_back({get<0>(*it), get<1>(*it)});
+                }
+            }
+            // now using this trussList_k, find the connected components using bfs 
+            // and store the connected components in a vector of vectors
+            vector<int> visited(n,0);
+            for (int i=0;i<n;i++){
+                if (!visited[i]){
+                    vector<int> component = print_connected_components(i, rank, size, nodes, visited, trussList_k);
 
-    // // now gather this trussList from all the processors and gather in rank 0 using MPI_Gatherv
-    // // cout << "rank = " << rank << " size = " << trussList.size() << endl;
-    // // gather the number of edges in each processor
-    // int* numEdges = new int[size];
-    // for(int i = 0; i < size; i ++)
-    //     numEdges[i] = 0;
-    // int my_edges = trussList.size()
-    // MPI_Gather(&my_edges, 1, MPI_INT, numEdges, 1, MPI_INT, 0, MPI_COMM_WORLD);
+                    // now gather all the components from all the processors
+                    // gather the number of components in each processor
+                    int* numComponents = new int[size];
+                    for(int i = 0; i < size; i ++)
+                        numComponents[i] = 0;
+                    int my_components = component.size();
+                    MPI_Gather(&my_components, 1, MPI_INT, numComponents, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    // // gather the trussList from all the processors
-    // int* recvTrussOffsets = new int[size];
-    // recvTrussOffsets[0] = 0;
-    // for (int i=1;i<size;i++){
-    //     recvTrussOffsets[i] = recvTrussOffsets[i-1] + numEdges[i-1];
-    // }
+                    // gather the components from all the processors
+                    int* recvComponentOffsets = new int[size];
+                    recvComponentOffsets[0] = 0;
+                    for (int i=1;i<size;i++){
+                        recvComponentOffsets[i] = recvComponentOffsets[i-1] + numComponents[i-1];
+                    }
 
-    // int tuple_size = sizeof(tuple<int,int,int>);
-    // vector<tuple<int,int,int>> recvList(recvTrussOffsets[size-1] + numEdges[size-1]);
+                    vector<int> recvComponents(recvComponentOffsets[size-1] + numComponents[size-1]);
 
-    // // multiply the values by size of datatype
-    // for (int i=0;i<size;i++){
-    //     numEdges[i] *= tuple_size;
-    //     recvTrussOffsets[i] *= tuple_size;
-    // }
-
-    // MPI_Gatherv(trussList.data(), my_edges*tuple_size, MPI_BYTE, recvList.data(), numEdges, recvTrussOffsets, MPI_BYTE, 0, MPI_COMM_WORLD);
-
-    // // now rank 0 will have the trussList of all the edges
-    // if (rank == 0){
-    //     // cout << "rank = " << rank << " size = " << recvList.size() << endl;
-    //     // for (auto it = recvList.begin(); it!= recvList.end(); it++){
-    //     //     cout << get<0>(*it) << " " << get<1>(*it) << " " << get<2>(*it) << endl;
-    //     // }
-
-    //     for (int k = k_minimum; k <= k_maximum; k++){
-    //         bool exists = false;
-    //         for (auto it = recvList.begin(); it!= recvList.end(); it++){
-    //             if (get<2>(*it) >= k+2){
-    //                 exists = true;
-    //                 break;
-    //             }
-    //         }
-    //         if (exists){
-    //             // find all the edges with truss number >= k+2
-    //             vector<tuple<int,int,int>> trussList_k;
-    //             for (auto it = recvList.begin(); it!= recvList.end(); it++){
-    //                 if (get<2>(*it) >= k+2){
-    //                     trussList_k.push_back(*it);
-    //                 }
-    //             }
-    //             cout << "k = " << k << " size = " << trussList_k.size() << endl;
-    //             // now using this trussList_k, find the connected components using bfs 
-    //             // and store the connected components in a vector of vectors
-    //             vector<vector<int>> connectedComponents;
-    //             vector<bool> visited(n, false);
-    //             // make adjacency list of the trussList_k
-    //             vector<vector<int>> adjList(n);
-    //             for (auto it = trussList_k.begin(); it!= trussList_k.end(); it++){
-    //                 adjList[get<0>(*it)].push_back(get<1>(*it));
-    //                 adjList[get<1>(*it)].push_back(get<0>(*it));
-    //             }
-    //             // now do bfs on the adjList
-    //             for (int i=0;i<n;i++){
-    //                 if (!visited[i]){
-    //                     vector<int> component;
-    //                     queue<int> q;
-    //                     q.push(i);
-    //                     visited[i] = true;
-    //                     while(!q.empty()){
-    //                         int u = q.front();
-    //                         q.pop();
-    //                         component.push_back(u);
-    //                         for (auto v: adjList[u]){
-    //                             if (!visited[v]){
-    //                                 q.push(v);
-    //                                 visited[v] = true;
-    //                             }
-    //                         }
-    //                     }
-    //                     connectedComponents.push_back(component);
-    //                 }
-    //             }
-    //             // now connectedComponents has all the connected components
-    //             // print this connectedComponents
-    //             cout << "k = " << k << endl;
-    //             cout << "Number of connected components = " << connectedComponents.size() << endl;
-    //             for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-    //                 sort(it->begin(), it->end());
-    //                 for (auto it2 = it->begin(); it2!= it->end(); it2++){
-    //                     cout << *it2 << " ";
-    //                 }
-    //                 cout << endl;
-    //             }
-
-    //         }
-    //         else {
-    //             cout << "k = " << k << endl;
-    //             cout << "Number of connected components = 0" << endl;
-    //         }
-    //     }
-
-    // }
+                    MPI_Gatherv(component.data(), my_components, MPI_INT, recvComponents.data(), numComponents, recvComponentOffsets, MPI_INT, 0, MPI_COMM_WORLD);
+                    if (recvComponents.size()>1) connectedComponents.push_back(recvComponents);
+                    for (auto it = recvComponents.begin(); it!= recvComponents.end(); it++){
+                        visited[*it] = 1;
+                    }
+                    // now broadcast this visited to all processors
+                    MPI_Bcast(visited.data(), n, MPI_INT, 0, MPI_COMM_WORLD);
+                }
+            }
+        }
+        if (rank ==0){
+            if (exists){
+                cout <<"1\n";
+                cout << connectedComponents.size() << endl;
+                for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
+                    sort(it->begin(), it->end());
+                    for (auto it2 = it->begin(); it2!= it->end(); it2++){
+                        cout << *it2 << " ";
+                    }
+                    cout << endl;
+                }
+            }
+            else {
+                cout << "0\n";
+            }
+        }
+    }
     
 
     MPI_Finalize();
