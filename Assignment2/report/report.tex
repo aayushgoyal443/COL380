@@ -8,9 +8,9 @@
 \usepackage{subcaption}
 \usepackage[colorlinks=true, linkcolor = blue, urlcolor = cyan]{hyperref}
 
-\title{Assignment 0 - COL380}
-\author{Aayush Goyal}
-\date{October 2021}
+\title{Assignment 2 - COL380}
+\author{Aayush Goyal 2019CS10452 & Rahul Chhabra 2019CS11016}
+\date{March 2023}
 
 \begin{document}
 
@@ -23,7 +23,100 @@
 \section{Introduction}
 We attempted numerous strategies indicated in the articles recommended in the assignment document to execute truss decomposition in a distributed scenario. We choose the MinTruss algorithm mentioned in \href{https://link.springer.com/chapter/10.1007/978-3-319-96983-1_50}{this publication}.
 
+\section{Steps by step discussion of the Algorithm}
+\subsection{Preliminaries}
+\begin{itemize}
+    \item \textbf{Support of an edge}: The number of triangles that contain the edge.
+    \item \textbf{Truss number of an edge}: Th maximal value of k such that the edge is contained in a k truss.
+\end{itemize}
+
+\subsection{Algorithm}
+
+The Distributeed Algorithm to compute the truss decomposition consists of mainly following steps:
+\begin{itemize}
+    \item \textbf{Step 1}: Distirubtion of the graph among the processors.
+    \item \textbf{Step 2}: Each processor computes the support of each edge assigned to it.
+    \item \textbf{Step 3}: Each processor computes the truss number of each edge assigned to it.
+    \item \textbf{Step 4}: Breadth First Search is performed to find the truss decomposition.
+\end{itemize}
+
+\subsection{Step 1: Distribution of the graph among the processors}
+The degrees of each of the node can be calculated by using the offsets mentioned in the header file. Using these degree values, one of the processors (say the master processor, in our case master processor is the one with rank 0) sorts the nodes according to the degree and distributes the nodes to other processors in round robin fashion. The position of node in sorted list is used a rank of that node. \\
+\begin{itemize}
+    \item For any undirected edge (u, v) in our graph, it is assigned to the node with lowe rank. This is done to ensure that the edge is assigned to only one processor.
+    \item The edges are distributed in a way such that the number of edges assigned to each processor is approximately equal. This ensures that the load on each processor is approximately equal.
+\end{itemize}
+
+\subsection{Step 2: Each processor computes the support of each edge assigned to it}
+This is a well studied problem in literature, commonly known as triangle enumeration algorithm . For this step, we use MPI to write a distributed implementation. The algorithm is as follows:
+% For triangle enumeration, for each edge e = (u,v) possessed by an MPI rank, we first load v's adjacency list if we are not the owner of v from the graph file, and then we find all the possible triangles (u,v,w). We also transmit this triangle information to all the MPI ranks that need it. In the end, we use the received information from the other ranks to add more triangles to each edge we have. There are a few optimizations that let us load the vertex from file less number of times but the basic idea is the same
+
+\begin{itemize}
+    \item For each edge e = (u,v) possessed by an MPI rank, we first load v's adjacency list if we are not the owner of v from the graph file.
+    \item We find all the possible triangles (u,v,w) and transmit this triangle information to all the MPI ranks that need it.
+    \item In the end, we use the received information from the other ranks to add more triangles to each edge we have.
+\end{itemize}
 
 
+\subsection{Step 3: Each processor computes the truss number of each edge assigned to it}
 
+This was the most interesting and challenging part of the assignment. Initially we implemented a naive approach to compute the truss number of each edge as mentioned in the assignment problem statement. However, this approach was very slow and did not scale well. We then implemented the algorithm mentioned in the paper \href{https://link.springer.com/chapter/10.1007/978-3-319-96983-1_50}{this publication}. The main focus of this paper was the Hybrid algorithm for truss decomposition. This algorithm is a combination of the following two algorithms:
+\begin{itemize}
+    \item MinTruss
+    \item PropTruss
+\end{itemize}
+
+However on implementing this algorithm, we found that it was not working as expected. We couldn't get the desired results and even there wsa not a very good improvement in time. So after a lot of discussion, we decided to implement the mintruss algorithm mentioned in the same paper. This algorithm worked well and gave us the desired results. The algorithm is as follows:
+
+% Algorithm MinTruss: For each edge e, the algorithm maintains an upperbound
+% τ(e) on the true truss number τ (e); it is initialized as τ(e) = suppG(e) + 2.
+% The algorithm marks all edges as not settled and proceeds iteratively. In each
+% iteration, among the edges not settled, select the edges with the least truss
+% Improved Distributed Algorithm for Graph Truss Decomposition 707
+% value and declare them to be settled. We then update the truss values of their
+% neighbors in the following manner. Let e = u, v be a selected edge. For each
+% triangle Δ(u, v, w) incident on e, if both u, w and v, w are not settled already,
+% then decrement the truss values τ(u, w) and τ(v, w) by one. Proceed in the above
+% manner till all the edges are settled.
+% Intuitively, imagine that the settled edges are deleted from the graph. The
+% deletion of an edge e destroys the triangles incident on it. When a triangle is
+% destroyed, the other two edges lose the support of the triangle. So, we decrement
+% their truss values, provided e is the first edge to be deleted among the three
+% edges. We can show that for each edge e, the truss value τ(e) gets decremented
+% monotonically and becomes the true truss number τ (e) before termination.
+
+
+\begin{itemize}
+    \item For each edge e, the algorithm maintains an upperbound τ(e) on the true truss number τ (e); it is initialized as τ(e) = suppG(e) + 2.
+    \item The algorithm marks all edges as not settled and proceeds iteratively. In each iteration, among the edges not settled, select the edges with the least truss value and declare them to be settled.
+    \item We then update the truss values of their neighbors in the following manner. Let e = u, v be a selected edge. For each triangle Δ(u, v, w) incident on e, if both u, w and v, w are not settled already, then decrement the truss values τ(u, w) and τ(v, w) by one.
+    \item The point to be careful about here is that there may be multiple processors working on the same triangle, so we need to do some consensus there to ensure there is no double decrement in truss number
+    \item Proceed in the above manner till all the edges are settled.
+
+\end{itemize}
+
+
+\subsection{Step 4: Breadth First Search is performed to find the truss decomposition}
+We referred the following video to implement the distributed BFS algorithm: \href{https://www.youtube.com/watch?v=wpWvCabHqQU}{this video}. The algorithm maintains two frontier lists, one for the current level and one for the next level. At a time all processors are processing the nodes of same level and exchanging the information about the nodes of next level. The algorithm is implemented using MPI_alltoallv and MPI_AllReduce. More details can be reffered from the video link mentioned.
+
+
+\section{Results}
+We ran our code on the following testcases:
+\begin{itemize}
+    \item \textbf{Testcase 3}
+    \item \textbf{Testcase 5} 
+    \item \textbf{Testcase 7}
+\end{itemize}
+
+Below is the graph showing the scalability analysis of our code. The x-axis represents the number of processors and the y-axis represents the time taken by the code to run. The graph shows that the code scales well with the number of processors. The time taken by the code to run is almost linearly proportional to the number of processors. The graph also shows that the code is able to run on 8 processors in a reasonable amount of time. \\
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{ass2_1.png}
+    \caption{Scalability Analysis}
+    \label{fig:scalability}
+\end{figure}
+
+\section{Conclusion}
+In this project, we implemented a distributed algorithm to compute the truss decomposition of a graph. We implemented the algorithm in C++ using MPI. We also implemented the triangle enumeration algorithm in MPI. We also implemented the distributed BFS algorithm to find the truss decomposition. We ran our code on the testcases provided in the assignment and the code was able to run on 8 processors in a reasonable amount of time. The code scales well with the number of processors. 
 \end{document}
