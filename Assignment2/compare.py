@@ -67,7 +67,7 @@ def compare(file1, file2):
     ashish.sort()
     aayra.sort()
 
-    special_demand(ashish, aayra, file1, file2)
+    # special_demand(ashish, aayra, file1, file2)
     
     # # open 2 files and write these lists to them
     # f1 = open("ashish_new.txt", 'w')

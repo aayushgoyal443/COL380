@@ -24,12 +24,12 @@ for i in [0,1,2,4,5,6,7,8,3,9,10,11,12]:
     print(start, end)
     print(f"Compiling test {i}")
     print("Running test " + str(i) + "...")
-    cmd_str = f"make test={i} start={start} end={end} run_parallel_parse"
+    cmd_str = f"make test={i} start={start} end={end} run_parallel_parse_verbose"
     print("Run command: " + cmd_str)
     subprocess.run(cmd_str, shell=True)
     print("Done")
     print("Checking results...")
-    cmd_str = f"python3 compare.py results/result_{i}.txt test_cases/A2/test{i}/output{i}.txt"
+    cmd_str = f"python3 compare.py results/result_{i}_verbose.txt test_cases/A2/test{i}/output{i}_verbose.txt"
     print("Comparing using: " + cmd_str)
     subprocess.run(cmd_str, shell=True)
     print("Done")

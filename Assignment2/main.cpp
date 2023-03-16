@@ -626,127 +626,123 @@ int main( int argc, char** argv ){
             }
         }
         MPI_Allreduce(MPI_IN_PLACE, &exists, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+        if (verbose ==0){
+            if (rank == 0){
+                if (exists) output << "1 ";
+                else output << "0 ";
+            }
+            continue;
+        }
+        if (exists == 0){
+            if (rank == 0) output << "0\n";
+            continue;
+        }
+
         vector<vector<int>> connectedComponents;
-        if (exists){
-            // find all the edges with truss number >= k+2
-            vector<pair<int,int>> trussList_k;
-            for (auto it = trussList.begin(); it!= trussList.end(); it++){
-                if (get<2>(*it) >= k+2){
-                    trussList_k.push_back({get<0>(*it), get<1>(*it)});
-                }
+        // find all the edges with truss number >= k+2
+        vector<pair<int,int>> trussList_k;
+        for (auto it = trussList.begin(); it!= trussList.end(); it++){
+            if (get<2>(*it) >= k+2){
+                trussList_k.push_back({get<0>(*it), get<1>(*it)});
             }
+        }
 
-            vector<vector<int>> adjList(nodes.size());
-            vector<vector<pair<int, int>>> sendTrussList(size);
-            for (auto p : trussList_k){
-                adjList[p.first].push_back(p.second);
-                int other_owner = nodes[p.second].owner;
-                if (other_owner != rank){
-                    sendTrussList[other_owner].push_back({p.second, p.first});
-                }
-                else{
-                    adjList[p.second].push_back(p.first);
-                }
+        vector<vector<int>> adjList(nodes.size());
+        vector<vector<pair<int, int>>> sendTrussList(size);
+        for (auto p : trussList_k){
+            adjList[p.first].push_back(p.second);
+            int other_owner = nodes[p.second].owner;
+            if (other_owner != rank){
+                sendTrussList[other_owner].push_back({p.second, p.first});
             }
-            vector<int> sendCounts(size, 0);
-            vector<int> recvCounts(size, 0);
-            vector<int> sendOffsets(size, 0);
-            vector<int> recvOffsets(size, 0);
-            for (int i=0; i<size; i++)
+            else{
+                adjList[p.second].push_back(p.first);
+            }
+        }
+        vector<int> sendCounts(size, 0);
+        vector<int> recvCounts(size, 0);
+        vector<int> sendOffsets(size, 0);
+        vector<int> recvOffsets(size, 0);
+        for (int i=0; i<size; i++)
+        {
+            sendCounts[i] = sendTrussList[i].size();
+        }
+        MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+        for (int i=0; i<size; i++)
+        {
+            sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
+            recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
+        }
+        vector<pair<int, int>> sendTrussListBuffer(sendOffsets[size-1] + sendCounts[size-1]);
+        vector<pair<int, int>> recvTrussListBuffer(recvOffsets[size-1] + recvCounts[size-1]);
+
+        for (int i=0; i<size; i++)
+        {
+            for (int j=0; j<sendCounts[i]; j++)
             {
-                sendCounts[i] = sendTrussList[i].size();
+                sendTrussListBuffer[sendOffsets[i] + j] = sendTrussList[i][j];
             }
-            MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-            for (int i=0; i<size; i++)
-            {
-                sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
-                recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
-            }
-            vector<pair<int, int>> sendTrussListBuffer(sendOffsets[size-1] + sendCounts[size-1]);
-            vector<pair<int, int>> recvTrussListBuffer(recvOffsets[size-1] + recvCounts[size-1]);
+        }
 
-            for (int i=0; i<size; i++)
-            {
-                for (int j=0; j<sendCounts[i]; j++)
-                {
-                    sendTrussListBuffer[sendOffsets[i] + j] = sendTrussList[i][j];
+        for (int i = 0; i < size; i++)
+        {
+            sendCounts[i] *= 2;
+            recvCounts[i] *= 2;
+            sendOffsets[i] *= 2;
+            recvOffsets[i] *= 2;
+        }
+
+
+        MPI_Alltoallv(sendTrussListBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvTrussListBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
+
+        for (int i=0; i<recvTrussListBuffer.size(); i++)
+        {
+            adjList[recvTrussListBuffer[i].first].push_back(recvTrussListBuffer[i].second);
+        }
+
+        // now using this trussList_k, find the connected components using bfs 
+        // and store the connected components in a vector of vectors
+        vector<int> visited(n,0);
+        for (int i=0;i<n;i++){
+            if (!visited[i]){
+                vector<int> component = print_connected_components(i, rank, size, nodes, visited, adjList);
+
+                // now gather all the components from all the processors
+                // gather the number of components in each processor
+                int* numComponents = new int[size];
+                for(int i = 0; i < size; i ++)
+                    numComponents[i] = 0;
+                int my_components = component.size();
+                MPI_Gather(&my_components, 1, MPI_INT, numComponents, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+                // gather the components from all the processors
+                int* recvComponentOffsets = new int[size];
+                recvComponentOffsets[0] = 0;
+                for (int i=1;i<size;i++){
+                    recvComponentOffsets[i] = recvComponentOffsets[i-1] + numComponents[i-1];
                 }
-            }
 
-            for (int i = 0; i < size; i++)
-            {
-                sendCounts[i] *= 2;
-                recvCounts[i] *= 2;
-                sendOffsets[i] *= 2;
-                recvOffsets[i] *= 2;
-            }
+                vector<int> recvComponents(recvComponentOffsets[size-1] + numComponents[size-1]);
 
-
-            MPI_Alltoallv(sendTrussListBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvTrussListBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
-
-            for (int i=0; i<recvTrussListBuffer.size(); i++)
-            {
-                adjList[recvTrussListBuffer[i].first].push_back(recvTrussListBuffer[i].second);
-            }
-
-            // now using this trussList_k, find the connected components using bfs 
-            // and store the connected components in a vector of vectors
-            vector<int> visited(n,0);
-            for (int i=0;i<n;i++){
-                if (!visited[i]){
-                    vector<int> component = print_connected_components(i, rank, size, nodes, visited, adjList);
-
-                    // now gather all the components from all the processors
-                    // gather the number of components in each processor
-                    int* numComponents = new int[size];
-                    for(int i = 0; i < size; i ++)
-                        numComponents[i] = 0;
-                    int my_components = component.size();
-                    MPI_Gather(&my_components, 1, MPI_INT, numComponents, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-                    // gather the components from all the processors
-                    int* recvComponentOffsets = new int[size];
-                    recvComponentOffsets[0] = 0;
-                    for (int i=1;i<size;i++){
-                        recvComponentOffsets[i] = recvComponentOffsets[i-1] + numComponents[i-1];
-                    }
-
-                    vector<int> recvComponents(recvComponentOffsets[size-1] + numComponents[size-1]);
-
-                    MPI_Gatherv(component.data(), my_components, MPI_INT, recvComponents.data(), numComponents, recvComponentOffsets, MPI_INT, 0, MPI_COMM_WORLD);
-                    if (recvComponents.size()>1) connectedComponents.push_back(recvComponents);
-                    for (auto it = recvComponents.begin(); it!= recvComponents.end(); it++){
-                        visited[*it] = 1;
-                    }
-                    // now broadcast this visited to all processors
-                    MPI_Bcast(visited.data(), n, MPI_INT, 0, MPI_COMM_WORLD);
+                MPI_Gatherv(component.data(), my_components, MPI_INT, recvComponents.data(), numComponents, recvComponentOffsets, MPI_INT, 0, MPI_COMM_WORLD);
+                if (recvComponents.size()>1) connectedComponents.push_back(recvComponents);
+                for (auto it = recvComponents.begin(); it!= recvComponents.end(); it++){
+                    visited[*it] = 1;
                 }
+                // now broadcast this visited to all processors
+                MPI_Bcast(visited.data(), n, MPI_INT, 0, MPI_COMM_WORLD);
             }
         }
         if (rank ==0){
-            if (exists){
-                if (verbose == 1){
-                    output <<"1\n";
-                    output << connectedComponents.size() << endl;
-                    for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-                        sort(it->begin(), it->end());
-                        for (auto it2 = it->begin(); it2!= it->end(); it2++){
-                            output << *it2 << " ";
-                        }
-                        output << endl;
-                    }
+            output <<"1\n";
+            output << connectedComponents.size() << endl;
+            for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
+                sort(it->begin(), it->end());
+                for (auto it2 = it->begin(); it2!= it->end(); it2++){
+                    output << *it2 << " ";
                 }
-                else{
-                    output << "1 ";
-                }
-            }
-            else {
-                if (verbose == 1){
-                    output << "0\n";
-                }
-                else{
-                    output << "0 ";
-                }
+                output << endl;
             }
         }
     }
