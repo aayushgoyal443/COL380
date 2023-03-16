@@ -55,7 +55,7 @@ def compare(file1, file2):
     ashish = ashu1.splitlines()
     aayra = aayra1.splitlines()
 
-    ashish = ashish[1:]
+    # ashish = ashish[1:]
     # aayra = aayra[1:]
     
     for i in range(len(ashish)):

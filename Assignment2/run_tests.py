@@ -24,7 +24,7 @@ for i in [0,1,2,4,5,6,7,8,3,9,10]:
     print(start, end)
     print(f"Compiling test {i}")
     print("Running test " + str(i) + "...")
-    cmd_str = f"make test={i} start={start} end={end} run_parallel > results/result_{i}.txt"
+    cmd_str = f"make test={i} start={start} end={end} run_parallel_parse"
     print("Run command: " + cmd_str)
     subprocess.run(cmd_str, shell=True)
     print("Done")
