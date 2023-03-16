@@ -227,6 +227,8 @@ int main( int argc, char** argv ){
 
     ifstream input(inputpath, ios::binary);
     ifstream header(headerpath, ios::binary);
+    ofstream output;
+    output.open(outputpath);
 
     int n, m;
     input.read((char*)&n, sizeof(int));
@@ -607,10 +609,8 @@ int main( int argc, char** argv ){
             }
 
         }
-
     }
 
-    
     // now make a trussList using the edgeList 
     vector<tuple<int,int,int>> trussList;
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
@@ -725,18 +725,28 @@ int main( int argc, char** argv ){
         }
         if (rank ==0){
             if (exists){
-                cout <<"1\n";
-                cout << connectedComponents.size() << endl;
-                for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-                    sort(it->begin(), it->end());
-                    for (auto it2 = it->begin(); it2!= it->end(); it2++){
-                        cout << *it2 << " ";
+                if (verbose == 1){
+                    output <<"1\n";
+                    output << connectedComponents.size() << endl;
+                    for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
+                        sort(it->begin(), it->end());
+                        for (auto it2 = it->begin(); it2!= it->end(); it2++){
+                            output << *it2 << " ";
+                        }
+                        output << endl;
                     }
-                    cout << endl;
+                }
+                else{
+                    output << "1 ";
                 }
             }
             else {
-                cout << "0\n";
+                if (verbose == 1){
+                    output << "0\n";
+                }
+                else{
+                    output << "0 ";
+                }
             }
         }
     }
