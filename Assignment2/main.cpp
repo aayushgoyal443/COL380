@@ -186,14 +186,44 @@ vector<int> print_connected_components(int source, int rank, int size, vector<No
     return component;
 }
 
+string result_parse(string& args, string finding){
+    string result = "";
+    int start = args.find(finding);
+    if (start == string::npos){
+        if (finding == "--p") return "0";
+        else return result;
+    }
+    start += finding.size() + 1;
+    for (int i=start;i<args.size();i++){
+        if (args[i] == '-' && args[i+1] == '-'){
+            break;
+        }
+        result += args[i];
+    }
+    return result;
+}
+
 
 int main( int argc, char** argv ){
 
-    string inputpath = argv[1];
-    string headerpath = argv[2];
-    string outputpath = argv[3];
-    int k_minimum = atoi(argv[4]);
-    int k_maximum = atoi(argv[5]);
+    string args = "";
+    for (int i = 1; i < argc; i++){
+        args += argv[i];
+    }
+
+    int taskid = stoi(result_parse(args, "--taskid"));
+    string inputpath = result_parse(args, "--inputpath");
+    string headerpath = result_parse(args, "--headerpath");
+    string outputpath = result_parse(args, "--outputpath");
+    int k_minimum = stoi(result_parse(args, "--startk"));
+    int k_maximum = stoi(result_parse(args, "--endk"));
+    int verbose = stoi(result_parse(args, "--verbose"));
+    int p = stoi(result_parse(args, "--p"));
+
+    if (taskid!=1){
+        cout << "Invalid taskid\n";
+        return 0;
+    } 
 
     ifstream input(inputpath, ios::binary);
     ifstream header(headerpath, ios::binary);
@@ -396,7 +426,7 @@ int main( int argc, char** argv ){
     int edge_list_count = edgeList.size();
     MPI_Allreduce(MPI_IN_PLACE, &edge_list_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-    unordered_set<pair<int, int>, hashFunction> settled;
+    set<pair<int, int>> settled;
     int iter = 0;
     while(true){
         iter++;
@@ -580,12 +610,7 @@ int main( int argc, char** argv ){
 
     }
 
-    // // print the truss number of each edge
-    // for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-    //     cout << it->first.first << " " << it->first.second << " " << it->second.truss_number << endl;
-    // }
     
-    // TODO: Now we just need to print the components directly
     // now make a trussList using the edgeList 
     vector<tuple<int,int,int>> trussList;
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
