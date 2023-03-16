@@ -428,7 +428,7 @@ int main( int argc, char** argv ){
         auto it = to_settle.begin();
         for (int i=0;i<global_to_settle_count;i++){
             pair<int,int> edge = {-1,-1};
-            int u,v;
+            int u=-1,v=-1;
             vector<vector<EdgeQuery>> sendEdgeQuery(size);
             
             if (it != to_settle.end()){
