@@ -97,7 +97,7 @@ However on implementing this algorithm, we found that it was not working as expe
 
 
 \subsection{Step 4: Breadth First Search is performed to find the truss decomposition}
-We referred the following video to implement the distributed BFS algorithm: \href{https://www.youtube.com/watch?v=wpWvCabHqQU}{this video}. The algorithm maintains two frontier lists, one for the current level and one for the next level. At a time all processors are processing the nodes of same level and exchanging the information about the nodes of next level. The algorithm is implemented using MPI_alltoallv and MPI_AllReduce. More details can be reffered from the video link mentioned.
+We referred the following video to implement the distributed BFS algorithm: \href{https://www.youtube.com/watch?v=wpWvCabHqQU}{this video}. The algorithm maintains two frontier lists, one for the current level and one for the next level. At a time all processors are processing the nodes of same level and exchanging the information about the nodes of next level. The algorithm is implemented using MPI\_alltoallv and MPI\_AllReduce. More details can be reffered from the video link mentioned.
 
 
 \section{Results}
@@ -108,15 +108,46 @@ We ran our code on the following testcases:
     \item \textbf{Testcase 7}
 \end{itemize}
 
+\subsection{Scalability Analysis}
 Below is the graph showing the scalability analysis of our code. The x-axis represents the number of processors and the y-axis represents the time taken by the code to run. The graph shows that the code scales well with the number of processors. The time taken by the code to run is almost linearly proportional to the number of processors. The graph also shows that the code is able to run on 8 processors in a reasonable amount of time. \\
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\textwidth]{ass2_1.png}
+    \includegraphics[width=0.7\textwidth]{ass2_1.png}
     \caption{Scalability Analysis}
     \label{fig:scalability}
 \end{figure}
 
+\subsection{Speedup Analysis}
+Below is the graph showing the speedup analysis of our code. The x-axis represents the number of processors and the y-axis represents the speedup by the code. The graph shows that the code speedsup well with the number of processors.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{ass2_2.png}
+    \caption{Speedup Analysis}
+    \label{fig:speedup}
+\end{figure}
+
+\subsection{Explanation of the results}
+The analysis that was given assessed how well our distributed implementation of the assignment performed using various test cases and varied core counts. The scalability graph makes it clear that the time it takes to run the test cases drops noticeably as we increase the number of cores. This suggests that the resources are being used effectively. The relationship between the number of processors and the speedup the code achieved has also been graphed. The graph demonstrates that using two cores effectively speeds up the code by 1.4–1.6 times. Nonetheless, we fell well short of the ideal speedup of two times due to the synchronisation and transmission overheads. Yet, by using a bulk synchronous technique rather than syncing after every few rounds, we have minimised these overheads as much as possible. The research shows that, overall, our approach is efficient at making use of parallelism and obtaining respectable speedups with many cores.
+
 \section{Conclusion}
-In this project, we implemented a distributed algorithm to compute the truss decomposition of a graph. We implemented the algorithm in C++ using MPI. We also implemented the triangle enumeration algorithm in MPI. We also implemented the distributed BFS algorithm to find the truss decomposition. We ran our code on the testcases provided in the assignment and the code was able to run on 8 processors in a reasonable amount of time. The code scales well with the number of processors. 
+% In this analysis, we have evaluated the performance of our implementation on
+% different test cases using varying numbers of cores. From our performance graph,
+% it is evident that as we increase the number of cores, the time taken to execute
+% the test cases decreases significantly. This indicates that our implementation is
+% taking advantage of parallelism and utilizing the available resources efficiently.
+% Furthermore, we have also created a speed-up graph that shows the ratio of
+% the time taken with one core to the time taken with multiple cores. From this
+% graph, we can see that our implementation achieves a good speed-up of 1.4-1.6
+% times with double cores. However, we did not achieve anything near the ideal
+% speed-up of 2 times due to the overheads associated with synchronization and
+% communication. Nevertheless, we have reduced these overheads as much as possible by implementing a bulk synchronous approach rather than synchronizing
+% after every few iterations.
+% Overall, our analysis demonstrates that our implementation is effective in
+% utilizing parallelism and achieving good speed-ups with multiple cores.
+
+In this project, we implemented a distributed algorithm to compute the truss decomposition of a graph. We implemented the algorithm in C++ using MPI. We also implemented the triangle enumeration algorithm in MPI. We also implemented the distributed BFS algorithm to find the truss decomposition. We ran our code on the testcases provided in the assignment and the code was able to run on 8 processors in a reasonable amount of time. The code scales well with the number of processors.
+
+
 \end{document}
