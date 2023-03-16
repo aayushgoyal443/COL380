@@ -1,10 +1,16 @@
-compile:
-	mpic++ -std=c++17 -o a2 main.cpp
+CC=g++
+CFLAGS=-g -Wall
+TARGET=main
+TEST=0
 
-run:
-	mpirun -np 4 ./a2 test_cases/A2/test0/test-input-0.gra test_cases/A2/test0/test-header-0.dat test_cases/test0/output0.txt 1 10
+compile_parallel:
+	mpic++ -std=c++17 -o a2_parallel main.cpp
 
+run_parallel:
+	mpirun -np 4 ./a2_parallel test_cases/A2/test$(test)/test-input-$(test).gra test_cases/A2/test$(test)/test-header-$(test).dat test_cases/A2/test$(test)/output$(test).txt $(start) $(end)
 
-compile_sample:
-	mpic++ -std=c++17 -o sample sample.cpp
-	mpirun -np 4 ./sample
+compile_serial:
+	g++ -std=c++17 -o a2_serial main_serial.cpp
+
+run_serial:
+	./a2_serial our_ass/test_cases/test$(test)/test-input-$(test).gra our_ass/test_cases/test$(test)/test-header-$(test).dat our_ass/test_cases/test$(test)/output$(test).txt $(start) $(end)

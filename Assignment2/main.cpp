@@ -105,62 +105,8 @@ void insertTriangle(int u, int v, int w, map<pair<int, int>, EdgeData>& edgeList
 }
 
 
-vector<int> print_connected_components(int source, int rank, int size, vector<Node> &nodes, vector<int>& visited, vector<pair<int,int>>& trusslist_k)
+vector<int> print_connected_components(int source, int rank, int size, vector<Node> &nodes, vector<int>& visited, vector<vector<int>>& adjList)
 {   
-    // using the trusslist make adj list 
-    vector<vector<int>> adjlist(nodes.size());
-    vector<vector<pair<int, int>>> sendTrussList(size);
-    for (auto p : trusslist_k){
-        adjlist[p.first].push_back(p.second);
-        int other_owner = nodes[p.second].owner;
-        if (other_owner != rank){
-            sendTrussList[other_owner].push_back({p.second, p.first});
-        }
-        else{
-            adjlist[p.second].push_back(p.first);
-        }
-    }
-    vector<int> sendCounts(size, 0);
-    vector<int> recvCounts(size, 0);
-    vector<int> sendOffsets(size, 0);
-    vector<int> recvOffsets(size, 0);
-    for (int i=0; i<size; i++)
-    {
-        sendCounts[i] = sendTrussList[i].size();
-    }
-    MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-    for (int i=0; i<size; i++)
-    {
-        sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
-        recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
-    }
-    vector<pair<int, int>> sendTrussListBuffer(sendOffsets[size-1] + sendCounts[size-1]);
-    vector<pair<int, int>> recvTrussListBuffer(recvOffsets[size-1] + recvCounts[size-1]);
-
-    for (int i=0; i<size; i++)
-    {
-        for (int j=0; j<sendCounts[i]; j++)
-        {
-            sendTrussListBuffer[sendOffsets[i] + j] = sendTrussList[i][j];
-        }
-    }
-
-    for (int i = 0; i < size; i++)
-    {
-        sendCounts[i] *= 2;
-        recvCounts[i] *= 2;
-        sendOffsets[i] *= 2;
-        recvOffsets[i] *= 2;
-    }
-
-
-    MPI_Alltoallv(sendTrussListBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvTrussListBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
-
-    for (int i=0; i<recvTrussListBuffer.size(); i++)
-    {
-        adjlist[recvTrussListBuffer[i].first].push_back(recvTrussListBuffer[i].second);
-    }
-
     vector<int> component;
     vector<int> frontier, next_frontier;
     int owner = nodes[source].owner;
@@ -183,7 +129,7 @@ vector<int> print_connected_components(int source, int rank, int size, vector<No
         for (int i=0; i<frontier.size(); i++)
         {
             int cur = frontier[i];
-            for(auto u: adjlist[cur])
+            for(auto u: adjList[cur])
             {
                 if (visited[u] == 0)
                 {
@@ -664,12 +610,66 @@ int main( int argc, char** argv ){
                     trussList_k.push_back({get<0>(*it), get<1>(*it)});
                 }
             }
+
+            vector<vector<int>> adjList(nodes.size());
+            vector<vector<pair<int, int>>> sendTrussList(size);
+            for (auto p : trussList_k){
+                adjList[p.first].push_back(p.second);
+                int other_owner = nodes[p.second].owner;
+                if (other_owner != rank){
+                    sendTrussList[other_owner].push_back({p.second, p.first});
+                }
+                else{
+                    adjList[p.second].push_back(p.first);
+                }
+            }
+            vector<int> sendCounts(size, 0);
+            vector<int> recvCounts(size, 0);
+            vector<int> sendOffsets(size, 0);
+            vector<int> recvOffsets(size, 0);
+            for (int i=0; i<size; i++)
+            {
+                sendCounts[i] = sendTrussList[i].size();
+            }
+            MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+            for (int i=0; i<size; i++)
+            {
+                sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
+                recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
+            }
+            vector<pair<int, int>> sendTrussListBuffer(sendOffsets[size-1] + sendCounts[size-1]);
+            vector<pair<int, int>> recvTrussListBuffer(recvOffsets[size-1] + recvCounts[size-1]);
+
+            for (int i=0; i<size; i++)
+            {
+                for (int j=0; j<sendCounts[i]; j++)
+                {
+                    sendTrussListBuffer[sendOffsets[i] + j] = sendTrussList[i][j];
+                }
+            }
+
+            for (int i = 0; i < size; i++)
+            {
+                sendCounts[i] *= 2;
+                recvCounts[i] *= 2;
+                sendOffsets[i] *= 2;
+                recvOffsets[i] *= 2;
+            }
+
+
+            MPI_Alltoallv(sendTrussListBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvTrussListBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
+
+            for (int i=0; i<recvTrussListBuffer.size(); i++)
+            {
+                adjList[recvTrussListBuffer[i].first].push_back(recvTrussListBuffer[i].second);
+            }
+
             // now using this trussList_k, find the connected components using bfs 
             // and store the connected components in a vector of vectors
             vector<int> visited(n,0);
             for (int i=0;i<n;i++){
                 if (!visited[i]){
-                    vector<int> component = print_connected_components(i, rank, size, nodes, visited, trussList_k);
+                    vector<int> component = print_connected_components(i, rank, size, nodes, visited, adjList);
 
                     // now gather all the components from all the processors
                     // gather the number of components in each processor
