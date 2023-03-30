@@ -12,7 +12,7 @@ cmd_str = f"make compile_parallel"
 subprocess.run(cmd_str, shell=True)
 
 # for i in [0,1,2,4,5,6,7,8,3,9,10,11,12]:
-for i in [0,1,2,4,5,6,7,8,3]: # Hi Aayush 
+for i in [0,1,2,4,5,6,7,8,3]:
     # fetch start and end value from our_ass/test_cases/test{i}/info.txt
     # run the test with the given start and end value
     # read the info.txt file
@@ -34,10 +34,6 @@ for i in [0,1,2,4,5,6,7,8,3]: # Hi Aayush
     print("Time taken: " + str(end_time - start_time) + " seconds")
     print("Done")
     print("Checking results...")
-
-# Hi aayush
-
-
     cmd_str = f"python3 compare.py results/result_{i}_verbose.txt test_cases/A2/test{i}/output{i}_verbose.txt"
     print("Comparing using: " + cmd_str)
     subprocess.run(cmd_str, shell=True)
