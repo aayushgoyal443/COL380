@@ -3,11 +3,18 @@ CFLAGS=-g -Wall
 TARGET=main
 TEST=0
 
-compile_parallel:
-	mpic++ -O2 -std=c++17 -o a2 main.cpp
+compile:
+	mpic++ -O2 -std=c++17 -o a3 main.cpp
 
-run_parallel_parse:
-	mpirun -np 4 ./a2 --taskid=1 --inputpath=test_cases/A2/test$(test)/test-input-$(test).gra --headerpath=test_cases/A2/test$(test)/test-header-$(test).dat --outputpath=results/result_$(test).txt  --verbose=0 --startk=$(start) --endk=$(end) --p=10
+run_task1:
+	mpirun -np 4 ./a3 --taskid=1 --inputpath=test_cases/A3/test$(test)/test-input-$(test).gra --headerpath=test_cases/A3/test$(test)/test-header-$(test).dat --outputpath=results/task1/result_$(test).txt --verbose=0 --startk=$(start) --endk=$(end) --p=$(p)
 
-run_parallel_parse_verbose:
-	mpirun -np 4 ./a2 --taskid=1 --inputpath=test_cases/A2/test$(test)/test-input-$(test).gra --headerpath=test_cases/A2/test$(test)/test-header-$(test).dat --outputpath=results/result_$(test)_verbose.txt  --verbose=1 --startk=$(start) --endk=$(end) --p=10
+run_task1_verbose:
+	mpirun -np 4 ./a3 --taskid=1 --inputpath=test_cases/A3/test$(test)/test-input-$(test).gra --headerpath=test_cases/A3/test$(test)/test-header-$(test).dat --outputpath=results/task1/result_$(test)_verbose.txt --verbose=1 --startk=$(start) --endk=$(end) --p=$(p)
+
+
+run_task2:
+	mpirun -np 4 ./a3 --taskid=2 --inputpath=test_cases/A3/test$(test)/test-input-$(test).gra --headerpath=test_cases/A3/test$(test)/test-header-$(test).dat --outputpath=results/task2/result_$(test).txt  --verbose=0 --startk=$(start) --endk=$(end) --p=$(p)
+
+run_task2_verbose:
+	mpirun -np 4 ./a3 --taskid=2 --inputpath=test_cases/A3/test$(test)/test-input-$(test).gra --headerpath=test_cases/A3/test$(test)/test-header-$(test).dat --outputpath=results/task2/result_$(test)_verbose.txt  --verbose=1 --startk=$(start) --endk=$(end) --p=$(p)

@@ -1,17 +1,10 @@
 #include <bits/stdc++.h>
 #include <unistd.h>
 #include <mpi.h>
+//[]#include <omp.h>
+//[]#include <chrono>
+//[]#include <ctime>
 using namespace std;
-
-
-struct hashFunction
-{
-  size_t operator()(const pair<int , 
-                    int> &x) const
-  {
-    return x.first ^ x.second;
-  }
-};
 
 
 class EdgeData{
@@ -203,14 +196,25 @@ string result_parse(string& args, string finding){
     return result;
 }
 
+// void print_time(string s, chrono::high_resolution_clock::time_point& start, chrono::high_resolution_clock::time_point& end){
+//     end = chrono::high_resolution_clock::now();
+//     auto duration = chrono::duration_cast<chrono::microseconds>(end - start);
+//     cout << s << " " << duration.count() << " microseconds" << endl;
+//     start = chrono::high_resolution_clock::now();
+// }
 
 int main( int argc, char** argv ){
 
+    // initialize begin time high resolution clock
+    auto start = chrono::high_resolution_clock::now();
+    auto end = chrono::high_resolution_clock::now();
+    
     string args = "";
     for (int i = 1; i < argc; i++){
         args += argv[i];
     }
-
+    
+    
     int taskid = stoi(result_parse(args, "--taskid"));
     string inputpath = result_parse(args, "--inputpath");
     string headerpath = result_parse(args, "--headerpath");
@@ -219,11 +223,6 @@ int main( int argc, char** argv ){
     int k_maximum = stoi(result_parse(args, "--endk"));
     int verbose = stoi(result_parse(args, "--verbose"));
     int p = stoi(result_parse(args, "--p"));
-
-    if (taskid!=1){
-        cout << "Invalid taskid\n";
-        return 0;
-    } 
 
     ifstream input(inputpath, ios::binary);
     ifstream header(headerpath, ios::binary);
@@ -245,6 +244,7 @@ int main( int argc, char** argv ){
 
     if (rank == 0){
         int sum=0;
+        // [OMP_PARALLEL_FOR]
         for(int i=0; i<n; i++){
             int degree;
             if (i==n-1){
@@ -267,6 +267,7 @@ int main( int argc, char** argv ){
         });
 
         // assign ranks to the nodes
+        // [OMP_PARALLEL_FOR]
         for(int i=0; i<n; i++){
             nodes[i].rank = i;
             nodes[i].owner = (i%size);
@@ -305,7 +306,7 @@ int main( int argc, char** argv ){
     map<pair<int, int>, EdgeData> edgeList;
     
     vector<vector<Query>> sendQueries(size);
-    for (int u = 0; u<n; u++ ){
+    for (int u = 0; u<n; u++ ){ // OMP_PARALLEL_FOR
         if (nodes[u].owner!= rank) continue;
         for (auto it1 = nodes[u].adjlist.begin(); it1!= nodes[u].adjlist.end(); it1++){
             for (auto it2 = next(it1); it2!= nodes[u].adjlist.end(); it2++){
@@ -320,7 +321,7 @@ int main( int argc, char** argv ){
                     // and we don't need to send it to anyone
                     if (nodes[v].adjlist.find(w) != nodes[v].adjlist.end()){
                         // cout << u << " " << v << " " << w << endl;
-                        insertTriangle(u, v, w, edgeList);
+                        insertTriangle(u, v, w, edgeList); // [OMP_PARALLEL_TASK]
                         insertTriangle(v, w, u, edgeList);
                         insertTriangle(u, w, v, edgeList);
                     }
@@ -361,7 +362,7 @@ int main( int argc, char** argv ){
     vector<Query> recvBuffer = vector<Query>(recvOffsets[size-1] + recvCounts[size-1]);
     
     // now we need to copy the queries into the send buffer
-    for(int i=0; i<size; i++){
+    for(int i=0; i<size; i++){ // [OMP_PARALLEL_FOR]
         for(int j=0; j<sendCounts[i]; j++){
             sendBuffer[sendOffsets[i] + j] = sendQueries[i][j];
         }
@@ -393,7 +394,7 @@ int main( int argc, char** argv ){
 
     // now we need to answer the queries and copy the answers into the send buffer
     for(int i=0; i<size; i++){
-        for(int j=0; j<recvCounts[i]; j++){
+        for(int j=0; j<recvCounts[i]; j++){ // [OMP_PARALLEL_FOR] Maybe
             Query q = recvBuffer[recvOffsets[i] + j];
             if (nodes[q.v].adjlist.find(q.w) != nodes[q.v].adjlist.end()){
                 sendBuffer2[recvOffsets[i] + j] = '1';
@@ -412,7 +413,7 @@ int main( int argc, char** argv ){
     // // now we have received the answers from the other processors
     // // we need to insert the triangles into the edgeList
     for(int i=0; i<size; i++){
-        for(int j=0; j<sendCounts[i]; j++){
+        for(int j=0; j<sendCounts[i]; j++){ // [OMP_PARALLEL_FOR] Maybe
             if (recvBuffer2[sendOffsets[i] + j]=='1'){
                 Query q = sendBuffer[sendOffsets[i] + j];
                 insertTriangle(q.u, q.v, q.w, edgeList);
@@ -420,7 +421,7 @@ int main( int argc, char** argv ){
             }
         }
     }
-
+   // OMP_PARALLEL_FOR
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
         it->second.truss_number = it->second.sup+2;
     }
@@ -438,7 +439,7 @@ int main( int argc, char** argv ){
             break;
         }
 
-        int min_truss = INT_MAX;
+        int min_truss = INT_MAX; // OMP_PARALLEL_FOR
         for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
             if (settled.find(it->first) == settled.end()){
                 if (it->second.truss_number < min_truss){
@@ -448,7 +449,7 @@ int main( int argc, char** argv ){
         }
         MPI_Allreduce(MPI_IN_PLACE, &min_truss, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
         set<pair<int,int>> to_settle;
-
+        /// OMP_PARALLEL_FOR
         for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
             if ( settled.count(it->first)==0 && edgeList[it->first].truss_number == min_truss){
                 to_settle.insert(it->first);
@@ -470,7 +471,7 @@ int main( int argc, char** argv ){
                 u = edge.first;
                 v = edge.second;
 
-                for (auto& triangle: edgeList[edge].triangles){
+                for (auto& triangle: edgeList[edge].triangles){ // OMP_PARALLEL_FOR MAybe
 
                     int w = triangle.first;
                     int uu=u, ww=w;
@@ -627,7 +628,7 @@ int main( int argc, char** argv ){
         }
         MPI_Allreduce(MPI_IN_PLACE, &exists, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-        if (verbose ==0){
+        if (verbose ==0 && taskid==1 ){
             if (rank == 0){
                 if (exists) output << "1 ";
                 else output << "0 ";
@@ -735,15 +736,60 @@ int main( int argc, char** argv ){
             }
         }
         if (rank ==0){
-            output <<"1\n";
-            output << connectedComponents.size() << endl;
+            if (taskid ==1 && verbose==1){
+                output <<"1\n";
+                output << connectedComponents.size() << endl;
+                for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
+                    sort(it->begin(), it->end());
+                    for (auto it2 = it->begin(); it2!= it->end(); it2++){
+                        output << *it2 << " ";
+                    }
+                    output << endl;
+                }
+                continue;
+            }
+            vector<int> color(n,-1);
+            int c = 0;
             for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-                sort(it->begin(), it->end());
                 for (auto it2 = it->begin(); it2!= it->end(); it2++){
-                    output << *it2 << " ";
+                    color[*it2] = c;
+                }
+                c++;
+            }
+            vector<int> influencer_vertices;
+            set<int> components[n];
+            for (int u = 0; u<n; u++ ){
+                // read the edges of the nodes assigned to this processor using the offsets
+                input.seekg(offsets[u]+8);
+                int degree = nodes[u].degree;
+                for(int j=0; j<degree; j++){
+                    int neighbour;
+                    input.read((char*)&neighbour, sizeof(int));
+                    if (color[neighbour]!=-1) components[u].insert(color[neighbour]);
+                }
+                if ( components[u].size() >= p ) {
+                    influencer_vertices.push_back(u);
+                }
+            }
+            assert(taskid ==2);
+            output << influencer_vertices.size() << endl;
+            if (verbose ==0){
+                for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
+                    output << *it << " ";
                 }
                 output << endl;
             }
+            else{
+                for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
+                    output << *it << endl;
+                    for (int i=0;i<n;i++){
+                        if (components[*it].count(color[i])){
+                            output << i << " ";
+                        }
+                    }
+                    output <<"\n";
+                }
+            }              
         }
     }
 

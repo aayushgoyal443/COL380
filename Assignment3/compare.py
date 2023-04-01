@@ -60,8 +60,10 @@ def compare(file1, file2):
     
     for i in range(len(ashish)):
         ashish[i] = ashish[i].strip().split()
+        ashish[i].sort()
     for i in range(len(aayra)):
         aayra[i] = aayra[i].strip().split()
+        aayra[i].sort()
 
     # sort the lists
     ashish.sort()

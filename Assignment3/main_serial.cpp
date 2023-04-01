@@ -60,75 +60,44 @@ void insertTriangle(int u, int v, int w, map<pair<int, int>, EdgeData>& edgeList
 }
 
 
-// void do_window_expansion(int k_max, pair<int,int> & window, int &gamma_active, int gamma_max, vector<pair<int, int>> & active_set, map<pair<int, int>, EdgeData>& edgeList, vector<vector<pair<int,int>>> &buckets){
-//     int k = window.second;
-//     double delta = 0.1;
-//     while (gamma_active <= delta * gamma_max && k != k_max){
-//         for (auto u: buckets[k+1]){
-//             active_set.push_back(u);
-//             gamma_active += edgeList[u].triangles.size();
-//         }
-//         k++;
-//     }
-//     window.second = k;
-// }
-
-
-// bool updateTriangle(pair<int, int> edge, int val_old, int val_new, map<pair<int, int>, EdgeData>& edgeList){
-//     int t_num = edgeList[edge].truss_number;
-//     if (val_old >= t_num && val_new >= t_num ){
-//     }
-//     else if (val_old >= t_num && val_new < t_num) {
-//         edgeList[edge].g -= 1;
-//         edgeList[edge].histogram[val_new]+=1;
-//     }
-//     else if (val_old < t_num && val_new < t_num) {
-//         edgeList[edge].histogram[val_old]-=1;
-//         edgeList[edge].histogram[val_new]+=1;
-//     }
-//     if (edgeList[edge].g < t_num-2){
-//         edgeList[edge].truss_number-=1;
-//         edgeList[edge].g += edgeList[edge].histogram[edgeList[edge].truss_number];   
-//         return true;
-//     }
-//     else return false;
-// }
-
-
-// void update_triangles_and_histograms(int u, int v, int w, int val_old, int val_new, map<pair<int, int>, EdgeData>& edgeList, set<pair<int,int> > &changed_edges, vector<Node> &nodes){
-    
-//     if (nodes[u].rank > nodes[w].rank)
-//     {
-//         bool updated = updateTriangle(make_pair(w, u), val_old, val_new, edgeList);  
-//         if (updated) changed_edges.insert(make_pair(w, u));
-//     }
-//     else{
-//         bool updated = updateTriangle(make_pair(u, w), val_old, val_new, edgeList);
-//         if (updated) changed_edges.insert(make_pair(u, w));
-//     }
-//     if (nodes[v].rank > nodes[w].rank)
-//     {
-//         bool updated = updateTriangle(make_pair(w, v), val_old, val_new, edgeList);   
-//         if (updated) changed_edges.insert(make_pair(w, v));
-//     }
-//     else{ 
-//         bool updated = updateTriangle(make_pair(v, w), val_old, val_new, edgeList);  
-//         if (updated) changed_edges.insert(make_pair(v, w)); 
-//     }
-
-// }
+string result_parse(string& args, string finding){
+    string result = "";
+    int start = args.find(finding);
+    if (start == string::npos){
+        if (finding == "--p") return "0";
+        else return result;
+    }
+    start += finding.size() + 1;
+    for (int i=start;i<args.size();i++){
+        if (args[i] == '-' && args[i+1] == '-'){
+            break;
+        }
+        result += args[i];
+    }
+    return result;
+}
 
 
 int main( int argc, char** argv ){
 
-    string inputpath = argv[1];
-    string headerpath = argv[2];
-    string outputpath = argv[3];
-    int k_minimum = atoi(argv[4]);
-    int k_maximum = atoi(argv[5]);
+    string args = "";
+    for (int i = 1; i < argc; i++){
+        args += argv[i];
+    }
+
+    int taskid = stoi(result_parse(args, "--taskid"));
+    string inputpath = result_parse(args, "--inputpath");
+    string headerpath = result_parse(args, "--headerpath");
+    string outputpath = result_parse(args, "--outputpath");
+    int k_minimum = stoi(result_parse(args, "--startk"));
+    int k_maximum = stoi(result_parse(args, "--endk"));
+    int verbose = stoi(result_parse(args, "--verbose"));
+    int p = stoi(result_parse(args, "--p"));
 
     ifstream input(inputpath, ios::binary);
     ifstream header(headerpath, ios::binary);
+    ofstream output;
+    output.open(outputpath);
 
     int n, m;
     input.read((char*)&n, sizeof(int));
@@ -153,6 +122,8 @@ int main( int argc, char** argv ){
         nodes[i].degree = degree;
     }
 
+    // cout <<"i1\n";
+
     // sort the nodes in order of their degree
     sort(nodes.begin(), nodes.end(), [](Node a, Node b){
         if (a.degree == b.degree){
@@ -171,7 +142,7 @@ int main( int argc, char** argv ){
         return a.id < b.id;
     });
 
-            
+    // cout << "i2\n";
     for (int u = 0; u<n; u++ ){
         // read the edges of the nodes assigned to this processor using the offsets
         input.seekg(offsets[u]+8);
@@ -188,8 +159,10 @@ int main( int argc, char** argv ){
     }
 
     map<pair<int, int>, EdgeData> edgeList;
-    
+    // cout << "i3\n";
+    // cout << "n = " << n << "\n";
     for (int u = 0; u<n; u++ ){
+        // if (u%500 == 0)cout << u << endl;
         for (auto it1 = nodes[u].adjlist.begin(); it1!= nodes[u].adjlist.end(); it1++){
             for (auto it2 = next(it1); it2!= nodes[u].adjlist.end(); it2++){
                 int v = *it1;
@@ -207,99 +180,13 @@ int main( int argc, char** argv ){
             }
         }
     }
-    
-    // // lets print the support for each edge in the edgeList
-    // for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-    //     cout << it->first.first << " " << it->first.second << " " << it->second.sup << endl;
-    // }
-
-    // print all the triangles 
-    // for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-    //     for (auto it1 = it->second.triangles.begin(); it1!= it->second.triangles.end(); it1++){
-    //         cout << it->first.first << " " << it->first.second << " " << it1->first << endl;
-    //     }
-    // }
-
-    // remember to deallocate the memory
-
-    // initialize the truss values in the edgeList
-
-    // int k_min = INT_MAX;
-    // int k_max = INT_MIN;
+    // cout << "i4\n";
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
         it->second.truss_number = it->second.sup + 2;
-        // it->second.g = it->second.sup;
-        // it->second.histogram = vector<int>(it->second.truss_number , 0);
-        // k_max = max(k_max, it->second.truss_number);
-        // k_min = min(k_min, it->second.truss_number);
     }    
 
-    /*
-    vector<vector<pair<int,int>>> buckets(k_max+1);
-    pair<int,int> window = make_pair(k_min,k_min);
+    cout << "Triangle Enumeration done ...\n";
 
-    vector<pair<int,int>> active_set;
-
-    int gamma_active = 0;
-    int gamma_max = 0;
-    // let add elements to the buckets and also update the active set and gamma_active
-    for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-        buckets[it->second.truss_number].push_back(it->first);
-        if (it->second.truss_number == k_min){
-            active_set.push_back(it->first);
-            gamma_active += it->second.sup;
-        }
-    }
-    // // lets print the size of each bucket, size of the active set and gamma_active
-    // for (int i=0; i<=k_max; i++){
-    //     cout << "Bucket " << i << " size: " << buckets[i].size() << endl;
-    // }
-    // cout << "Active set size: " << active_set.size() << endl;
-    // cout << "Gamma active: " << gamma_active << endl;
-    // cout << "Gamma max: " << gamma_max << endl;
-    // cout << "Window: " << window.first << " " << window.second << endl;
-    // cout << "--------------------------------------------" << endl;
-
-    while (true){
-        
-        if (active_set.size() == 0 and window.second == k_max){
-            break;
-        }
-        do_window_expansion(k_max, window, gamma_active, gamma_max, active_set, edgeList, buckets);
-        set<pair<int, int>> changed_edges;
-        for(auto edge: active_set){
-            for (auto &triangle: edgeList[edge].triangles){
-                if (edgeList[edge].truss_number >= triangle.second){
-                    continue;
-                }
-                int val_old = triangle.second;
-                triangle.second = edgeList[edge].truss_number;
-                int val_new = triangle.second;
-                int u = edge.first;
-                int v = edge.second;
-                int w = triangle.first;
-                update_triangles_and_histograms(u, v, w, val_old, val_new, edgeList, changed_edges, nodes);
-            }
-        }
-
-        // update active set with the edges which were changed in the current iteration
-        active_set.clear();
-        gamma_active = 0;
-        for (auto &edge: changed_edges){
-            active_set.push_back(edge);  
-            gamma_active += edgeList[edge].sup; 
-        }
-        gamma_max = max(gamma_max, gamma_active);
-        // TODO: DEallocate memory to avoid segmentation fault
-    }   
-
-    // lets print the truss number of each edge in the edgeList
-    for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
-        cout << it->first.first << " " << it->first.second << " " << it->second.truss_number << endl;
-    }
-    */
-
-    // implement the minTruss algorithm
     set<pair<int,int>> settled;
 
     while(settled.size() < edgeList.size()){
@@ -366,11 +253,9 @@ int main( int argc, char** argv ){
         trussList.push_back(make_tuple(it->first.first, it->first.second, it->second.truss_number));
     }
 
-    // now rank 0 will have the trussList of all the edges
-        // cout << "rank = " << rank << " size = " << recvList.size() << endl;
-        // for (auto it = recvList.begin(); it!= recvList.end(); it++){
-        //     cout << get<0>(*it) << " " << get<1>(*it) << " " << get<2>(*it) << endl;
-        // }
+
+    cout << "Truss Decomposition done ..." << endl;
+
 
     for (int k = k_minimum; k <= k_maximum; k++){
         bool exists = false;
@@ -400,16 +285,20 @@ int main( int argc, char** argv ){
                 adjList[get<1>(*it)].push_back(get<0>(*it));
             }
             // now do bfs on the adjList
+            vector<int> color(n, -1);
+            int cur_color = 0;
             for (int i=0;i<n;i++){
                 if (!visited[i]){
                     vector<int> component;
                     queue<int> q;
                     q.push(i);
+                    color[i] = cur_color;
                     visited[i] = true;
                     while(!q.empty()){
                         int u = q.front();
                         q.pop();
                         component.push_back(u);
+                        color[u] = cur_color;
                         for (auto v: adjList[u]){
                             if (!visited[v]){
                                 q.push(v);
@@ -417,22 +306,47 @@ int main( int argc, char** argv ){
                             }
                         }
                     }
+                    cur_color++;
                     if (component.size()>1) connectedComponents.push_back(component);
+                    else{
+                        color[component[0]] = -1;
+                    }
                 }
             }
-            // now connectedComponents has all the connected components
-            // print this connectedComponents
-            // cout << "k = " << k << endl;
-            cout <<"1\n";
-            // cout << "Number of connected components = " << connectedComponents.size() << endl;
-            cout << connectedComponents.size() << endl;
-            for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-                sort(it->begin(), it->end());
-                for (auto it2 = it->begin(); it2!= it->end(); it2++){
-                    cout << *it2 << " ";
+
+            // for (auto i=0;i<n;i++){
+            //     cout << color[i] << " ";
+            // }cout << endl;
+
+            vector<int> influencer_vertices;
+            set<int> components[n];
+            for(int i = 0; i < n; i ++)
+            {   
+                for(auto u:nodes[i].adjlist)
+                {
+                    if ( color[u]!=-1 ) components[i].insert(color[u]);
+                    if ( color[i]!=-1 ) components[u].insert(color[i]);
                 }
-                cout << endl;
             }
+            for(int i = 0; i < n; i ++)
+            {
+                if (components[i].size() >= p) influencer_vertices.push_back(i);
+            }
+            
+            output << influencer_vertices.size() << endl;
+            for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
+                output << *it << " ";
+            } output << endl;
+            
+            // output <<"1\n";
+            // output << connectedComponents.size() << endl;
+            // for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
+            //     sort(it->begin(), it->end());
+            //     for (auto it2 = it->begin(); it2!= it->end(); it2++){
+            //         output << *it2 << " ";
+            //     }
+            //     output << endl;
+            // }
 
         }
         else {
