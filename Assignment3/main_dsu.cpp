@@ -183,10 +183,12 @@ string result_parse(string& args, string finding){
 }
 
 void print_time(string s, chrono::high_resolution_clock::time_point& start, chrono::high_resolution_clock::time_point& end, int rank){
-    // end = chrono::high_resolution_clock::now();
-    // // print the time duration in seconds
-    // cout <<"[" << rank << "]" << s << " " << chrono::duration_cast<chrono::nanoseconds>(end - start).count()*1e-6 << " mseconds" << endl;
-    // start = chrono::high_resolution_clock::now();
+    if (s == "query_total_m"){
+    end = chrono::high_resolution_clock::now();
+    // print the time duration in seconds
+    cout <<"[" << rank << "]" << s << " " << chrono::duration_cast<chrono::nanoseconds>(end - start).count()*1e-6 << " mseconds" << endl;
+    start = chrono::high_resolution_clock::now();
+    }
 }
 
 int main( int argc, char** argv ){
@@ -708,18 +710,31 @@ int main( int argc, char** argv ){
             }
 
             vector<int> influencer_vertices;
-            set<int> components[n];
+            // cout << "n = " << n << endl;
+            
+            vector<vector<int>> to_print_components;
             for (int u = 0; u<n; u++ ){
                 // read the edges of the nodes assigned to this processor using the offsets
+                // cout << "u = " << u << endl;
+                set<int> component;
                 input.seekg(offsets[u]+8);
                 int degree = nodes[u].degree;
                 for(int j=0; j<degree; j++){
                     int neighbour;
                     input.read((char*)&neighbour, sizeof(int));
-                    if (dsu.size[dsu.find(neighbour)]>1) components[u].insert(dsu.find(neighbour));
+                    if (dsu.size[dsu.find(neighbour)]>1) component.insert(dsu.find(neighbour));
                 }
-                if ( components[u].size() >= p ) {
+                if ( component.size() >= p ) {
                     influencer_vertices.push_back(u);
+                    if (verbose ==1){
+                        vector<int> temp;
+                        for (int i=0;i<n;i++){
+                            if (component.count(dsu.find(i))){
+                                temp.push_back(i);
+                            }
+                        }
+                        to_print_components.push_back(temp);
+                    }
                 }
             }
             output << influencer_vertices.size() << endl;
@@ -727,17 +742,15 @@ int main( int argc, char** argv ){
                 for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
                     output << *it << " ";
                 }
-                output << endl;
+                if (influencer_vertices.size()!=0) output << endl;
             }
             else{
-                for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
-                    output << *it << endl;
-                    for (int i=0;i<n;i++){
-                        if (components[*it].count(dsu.find(i))){
-                            output << i << " ";
-                        }
+                for (int i=0;i<to_print_components.size();i++){
+                    output << influencer_vertices[i] << "\n";
+                    for (int j=0;j<to_print_components[i].size();j++){
+                        output << to_print_components[i][j] << " ";
                     }
-                    output <<"\n";
+                    output << endl;
                 }
             }          
             print_time("query_influencer_m", start, end, rank );    

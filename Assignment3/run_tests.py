@@ -16,7 +16,7 @@ print(f"Running tests for task {task} with verbose={verbose}")
 cmd_str = f"make compile"
 subprocess.run(cmd_str, shell=True)
 
-for i in [1]:
+for i in [1,2,3,4]:
     # fetch start and end value from our_ass/test_cases/test{i}/info.txt
     # run the test with the given start and end value
     # read the info.txt file
@@ -41,5 +41,5 @@ for i in [1]:
     print("Done")
 
 
-cmd_str = f"make clean"
-subprocess.run(cmd_str, shell=True)
+# cmd_str = f"make clean"
+# subprocess.run(cmd_str, shell=True)
