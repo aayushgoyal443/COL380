@@ -4,7 +4,7 @@ TARGET=main
 TEST=0
 
 compile:
-	mpic++ -O2 -fopenmp -w -std=c++17 -o a3 main_dsu.cpp
+	mpic++ -O2 -fopenmp -w -std=c++17 -o a3 main.cpp
 
 run_task1:
 	mpirun -np 4 ./a3 --taskid=1 --inputpath=test_cases/A3/test$(test)/test-input-$(test).gra --headerpath=test_cases/A3/test$(test)/test-header-$(test).dat --outputpath=results/task1/result_$(test).txt --verbose=0 --startk=$(start) --endk=$(end) --p=$(p)

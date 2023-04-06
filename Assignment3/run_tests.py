@@ -13,7 +13,7 @@ print(f"Running tests for task {task} with verbose={verbose}")
 # cmd_str = "ls -l /tmp | awk '{print $3,$9}' | grep root"
 # subprocess.run(cmd_str, shell=True)
 
-cmd_str = f"make compile"
+cmd_str = f"make"
 subprocess.run(cmd_str, shell=True)
 
 for i in [1,2,3,4]:
@@ -41,5 +41,5 @@ for i in [1,2,3,4]:
     print("Done")
 
 
-# cmd_str = f"make clean"
-# subprocess.run(cmd_str, shell=True)
+cmd_str = f"make clean"
+subprocess.run(cmd_str, shell=True)

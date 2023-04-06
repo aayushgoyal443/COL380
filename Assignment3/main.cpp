@@ -1,10 +1,77 @@
 #include <bits/stdc++.h>
 #include <unistd.h>
 #include <mpi.h>
-//[]#include <omp.h>
-//[]#include <chrono>
+#include <omp.h>
+#include <chrono>
 //[]#include <ctime>
 using namespace std;
+
+
+// Implement a DSU class and write a function which takes an edge list and prints the connected components of the graph
+
+class DSU{
+public:
+    vector<int> parent;
+    vector<int> rank;
+    vector<int> size;
+    int num_components;
+
+    DSU(int n){
+        this->parent = vector<int>(n);
+        this->size = vector<int>(n, 1);
+        this->num_components = n;
+        for (int i=0; i<n; i++){
+            this->parent[i] = i;
+        }
+    }
+
+    int find(int u){
+        if (u == this->parent[u]){
+            return u;
+        }
+        return this->parent[u] = find(this->parent[u]);
+    }
+
+    void unite(int u, int v){
+        u = find(u);
+        v = find(v);
+        if (u != v){
+            if (this->size[u] < this->size[v]){
+                swap(u, v);
+            }
+            this->parent[v] = u;
+            this->size[u] += this->size[v];
+            this->num_components--;
+        }
+    }
+
+    // take edgeList as input and complete the parent array
+    void complete_parent(pair<int, int>* edgeList, int arrSize){
+        for (int i=0; i<arrSize; i++){
+            int u = edgeList[i].first;
+            int v = edgeList[i].second;
+            unite(u, v);
+        }
+    }
+
+    void print_connected_components(ofstream& out){
+        // cout << this->num_components << endl;
+        map<int,vector<int>> components;
+        for (int i=0; i<this->parent.size(); i++){
+            if (size[find(i)]> 1) components[find(i)].push_back(i);
+        }
+        out << components.size() << endl;
+        for (auto component: components){
+            for (auto node: component.second){
+                out << node << " ";
+            }
+            out << endl;
+        }
+    }
+
+
+};
+
 
 
 class EdgeData{
@@ -98,87 +165,6 @@ void insertTriangle(int u, int v, int w, map<pair<int, int>, EdgeData>& edgeList
 }
 
 
-vector<int> print_connected_components(int source, int rank, int size, vector<Node> &nodes, vector<int>& visited, vector<vector<int>>& adjList)
-{   
-    vector<int> component;
-    vector<int> frontier, next_frontier;
-    int owner = nodes[source].owner;
-    if (owner == rank)
-    {
-        frontier.push_back(source);
-        visited[source] = 1;
-        component.push_back(source);
-    }
-    while (true)
-    {
-        next_frontier.clear();
-        vector<vector<int>> sendUpdates(size);
-        vector<vector<int>> recvUpdates(size);
-        vector<int> sendCounts(size, 0);
-        vector<int> recvCounts(size, 0);
-        vector<int> sendOffsets(size, 0);
-        vector<int> recvOffsets(size, 0);
-
-        for (int i=0; i<frontier.size(); i++)
-        {
-            int cur = frontier[i];
-            for(auto u: adjList[cur])
-            {
-                if (visited[u] == 0)
-                {
-                    int owner = nodes[u].owner;
-                    if (owner == rank)
-                    {
-                        next_frontier.push_back(u);
-                        visited[u] = 1;
-                        component.push_back(u);
-                    }
-                    else{
-                        sendUpdates[owner].push_back(u);
-                        sendCounts[owner]++;
-                    }
-                }
-            }
-        }
-
-        MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-        for (int i=0; i<size; i++)
-        {
-            sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
-            recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
-        }
-        vector<int> sendBuffer(sendOffsets[size-1] + sendCounts[size-1]);
-        vector<int> recvBuffer(recvOffsets[size-1] + recvCounts[size-1]);
-        for (int i=0; i<size; i++)
-        {
-            for (int j=0; j<sendCounts[i]; j++)
-            {
-                sendBuffer[sendOffsets[i] + j] = sendUpdates[i][j];
-            }
-        }
-        MPI_Alltoallv(sendBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
-        for (int i=0; i<size; i++)
-        {
-            for (int j=0; j<recvCounts[i]; j++)
-            {
-                int u = recvBuffer[recvOffsets[i] + j];
-                if (visited[u] == 0)
-                {
-                    next_frontier.push_back(u);
-                    visited[u] = 1;
-                    component.push_back(u);
-                }
-            }
-        }
-        frontier = next_frontier;
-        int fsize = frontier.size();
-        int global_fsize = 0;
-        MPI_Allreduce(&fsize, &global_fsize, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-        if (global_fsize == 0) break;
-    }
-    return component;
-}
-
 string result_parse(string& args, string finding){
     string result = "";
     int start = args.find(finding);
@@ -196,16 +182,19 @@ string result_parse(string& args, string finding){
     return result;
 }
 
-// void print_time(string s, chrono::high_resolution_clock::time_point& start, chrono::high_resolution_clock::time_point& end){
-//     end = chrono::high_resolution_clock::now();
-//     auto duration = chrono::duration_cast<chrono::microseconds>(end - start);
-//     cout << s << " " << duration.count() << " microseconds" << endl;
-//     start = chrono::high_resolution_clock::now();
-// }
+void print_time(string s, chrono::high_resolution_clock::time_point& start, chrono::high_resolution_clock::time_point& end, int rank){
+    // if (s == "query_total_m"){
+    // end = chrono::high_resolution_clock::now();
+    // // print the time duration in seconds
+    // cout <<"[" << rank << "]" << s << " " << chrono::duration_cast<chrono::nanoseconds>(end - start).count()*1e-6 << " mseconds" << endl;
+    // start = chrono::high_resolution_clock::now();
+    // }
+}
 
 int main( int argc, char** argv ){
 
     // initialize begin time high resolution clock
+    auto start_init = chrono::high_resolution_clock::now();
     auto start = chrono::high_resolution_clock::now();
     auto end = chrono::high_resolution_clock::now();
     
@@ -237,11 +226,12 @@ int main( int argc, char** argv ){
     header.read((char*)offsets, sizeof(int)*n);
     int rank, size;
     MPI_Init(&argc, &argv);
+    // MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     vector<Node> nodes(n);
-
+    print_time("init", start, end, rank );
     if (rank == 0){
         int sum=0;
         // [OMP_PARALLEL_FOR]
@@ -257,7 +247,7 @@ int main( int argc, char** argv ){
             nodes[i].id = i;
             nodes[i].degree = degree;
         }
-
+        print_time("read", start, end, rank );
         // sort the nodes in order of their degree
         sort(nodes.begin(), nodes.end(), [](Node a, Node b){
             if (a.degree == b.degree){
@@ -277,7 +267,7 @@ int main( int argc, char** argv ){
         sort(nodes.begin(), nodes.end(), [](Node a, Node b){
             return a.id < b.id;
         });
-
+        print_time("sort", start, end, rank );
         // now they are back in the oringinal order
 
     }
@@ -286,7 +276,7 @@ int main( int argc, char** argv ){
     MPI_Bcast(nodes.data(), n * sizeof(Node), MPI_BYTE, 0, MPI_COMM_WORLD);
     // broadcast the offsets to all the processors
     MPI_Bcast(offsets, n, MPI_INT, 0, MPI_COMM_WORLD);
-            
+    print_time("broadcast", start, end, rank );     
     for (int u = 0; u<n; u++ ){
         if (nodes[u].owner!= rank) continue;
         // read the edges of the nodes assigned to this processor using the offsets
@@ -302,10 +292,14 @@ int main( int argc, char** argv ){
         }
         nodes[u].adjlist = adjlist;
     }
-
+    print_time("readlist", start, end, rank );
     map<pair<int, int>, EdgeData> edgeList;
     
     vector<vector<Query>> sendQueries(size);
+    // #pragma omp parallel
+    // #pragma omp for 
+    // #pragma omp parallel for
+    // #pragma omp task
     for (int u = 0; u<n; u++ ){ // OMP_PARALLEL_FOR
         if (nodes[u].owner!= rank) continue;
         for (auto it1 = nodes[u].adjlist.begin(); it1!= nodes[u].adjlist.end(); it1++){
@@ -334,7 +328,7 @@ int main( int argc, char** argv ){
     }
     // cout << "owner of 4492 is " << nodes[4492].owner << endl;
     // cout << "owner of 4490 is " << nodes[4492].owner << endl;
-    
+    print_time("query_buffer", start, end, rank );
     // u we need to find out how many queries we are going to send to each processor
     int* sendCounts = new int[size];
     int* sendOffsets = new int[size];
@@ -406,12 +400,12 @@ int main( int argc, char** argv ){
         }
     }
 
-
+    print_time("query_answer", start, end, rank );
     // // now we need to send the answers to the appropriate processors
     MPI_Alltoallv(sendBuffer2, recvCounts, recvOffsets, MPI_CHAR, recvBuffer2, sendCounts, sendOffsets, MPI_CHAR, MPI_COMM_WORLD);
 
-    // // now we have received the answers from the other processors
-    // // we need to insert the triangles into the edgeList
+    //now we have received the answers from the other processors
+    //we need to insert the triangles into the edgeList
     for(int i=0; i<size; i++){
         for(int j=0; j<sendCounts[i]; j++){ // [OMP_PARALLEL_FOR] Maybe
             if (recvBuffer2[sendOffsets[i] + j]=='1'){
@@ -421,26 +415,31 @@ int main( int argc, char** argv ){
             }
         }
     }
+    // test 1,2,3 -> 8 sec
+    print_time("query_insert", start, end, rank );
    // OMP_PARALLEL_FOR
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
         it->second.truss_number = it->second.sup+2;
     }
-
+    print_time("truss_init", start, end, rank );
     int edge_list_count = edgeList.size();
     MPI_Allreduce(MPI_IN_PLACE, &edge_list_count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
+    print_time("edge_list_count", start, end, rank );
     set<pair<int, int>> settled;
     int iter = 0;
     while(true){
+        // if (iter == 1) break;
         iter++;
+
         int count = settled.size();
+        // print_time("while loop iter = " + to_string(iter), start, end, rank);
         MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         if (count == edge_list_count){
             break;
         }
 
-        int min_truss = INT_MAX; // OMP_PARALLEL_FOR
-        for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
+        int min_truss = INT_MAX; // OMP_PARALLEL_FOR        
+        for (auto it = edgeList.begin(); it!= edgeList.end(); it++){            
             if (settled.find(it->first) == settled.end()){
                 if (it->second.truss_number < min_truss){
                     min_truss = it->second.truss_number;
@@ -450,6 +449,7 @@ int main( int argc, char** argv ){
         MPI_Allreduce(MPI_IN_PLACE, &min_truss, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
         set<pair<int,int>> to_settle;
         /// OMP_PARALLEL_FOR
+        // #pragma omp parallel for
         for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
             if ( settled.count(it->first)==0 && edgeList[it->first].truss_number == min_truss){
                 to_settle.insert(it->first);
@@ -459,6 +459,8 @@ int main( int argc, char** argv ){
         int global_to_settle_count=INT_MIN;
         MPI_Allreduce(&to_settle_count, &global_to_settle_count, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
         auto it = to_settle.begin();
+        // print_time("before follop to_settle", start, end, rank);
+
         for (int i=0;i<global_to_settle_count;i++){
             pair<int,int> edge = {-1,-1};
             int u=-1,v=-1;
@@ -470,7 +472,6 @@ int main( int argc, char** argv ){
                 settled.insert(edge);
                 u = edge.first;
                 v = edge.second;
-
                 for (auto& triangle: edgeList[edge].triangles){ // OMP_PARALLEL_FOR MAybe
 
                     int w = triangle.first;
@@ -488,22 +489,37 @@ int main( int argc, char** argv ){
                     int owner_vvv = nodes[vvv].owner;
 
                     if (owner_uu == rank && owner_vvv == rank ){
+                        string uu_ww = to_string(uu) + "_" + to_string(ww);
                         bool settled_uu_ww = settled.count(make_pair(uu,ww));   
                         bool settled_vvv_www = settled.count(make_pair(vvv,www));
+                        // #pragma omp critical (uu_ww)
                         if (!settled_uu_ww && !settled_vvv_www){
-                            if (edgeList[make_pair(uu,ww)].truss_number > min_truss) edgeList[make_pair(uu,ww)].truss_number-=1;
-                            if (edgeList[make_pair(vvv,www)].truss_number > min_truss) edgeList[make_pair(vvv,www)].truss_number-=1;
+                            if (edgeList[make_pair(uu,ww)].truss_number > min_truss){
+                                edgeList[make_pair(uu,ww)].truss_number-=1;
+                            }
+                            if (edgeList[make_pair(vvv,www)].truss_number > min_truss){
+                                edgeList[make_pair(vvv,www)].truss_number-=1;
+                            }
                         }                   
                     }
                     else if (owner_uu != rank && owner_vvv != rank){
+                        string owner_uu_name = to_string(owner_uu);
+                        // #pragma omp critical (owner_uu_name)
                         sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, 0, true ));
                     }
-                    else if (owner_uu != rank) sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, (owner_vvv== rank)? settled.count(make_pair(vvv,www)) : 1 ,  false ));
-                    else if (owner_vvv != rank) sendEdgeQuery[owner_vvv].push_back(EdgeQuery({vvv,www},{uu,ww}, (owner_uu== rank)? settled.count(make_pair(uu,ww)) : 1, false ));
-
+                    else if (owner_uu != rank){
+                        string owner_uu_name = to_string(owner_uu);
+                        // #pragma omp critical (owner_uu_name)
+                        sendEdgeQuery[owner_uu].push_back(EdgeQuery({uu,ww},{vvv,www}, (owner_vvv== rank)? settled.count(make_pair(vvv,www)) : 1 ,  false ));
+                    }
+                    else if (owner_vvv != rank){
+                        string owner_vvv_name = to_string(owner_vvv);
+                        // #pragma omp critical (owner_vvv_name)
+                        sendEdgeQuery[owner_vvv].push_back(EdgeQuery({vvv,www},{uu,ww}, (owner_uu== rank)? settled.count(make_pair(uu,ww)) : 1, false ));
+                    }
                 }
             }
-            
+
             vector<pair<int,int>> send_main_edge(size, {u,v});
             vector<pair<int,int>> recv_main_edge(size);
             MPI_Alltoall( send_main_edge.data() , sizeof(pair<int,int>), MPI_BYTE, recv_main_edge.data(), sizeof(pair<int,int>), MPI_BYTE, MPI_COMM_WORLD);
@@ -585,8 +601,8 @@ int main( int argc, char** argv ){
             }
 
             MPI_Alltoallv(sendResponseBuffer, recvCounts, recvOffsets, MPI_INT, recvResponseBuffer, sendCounts, sendOffsets, MPI_INT, MPI_COMM_WORLD);
-
             // now use thne recvResponseBuffer to update the other_edge in the sendEdgeQuery
+            // print_time("[594]before updating the other edge", start, end, rank);
             for(int i = 0; i < size; i++){
                 for(int j = 0; j < sendCounts[i]; j++){
                     EdgeQuery q = sendEdgeQuery[i][j];
@@ -610,24 +626,28 @@ int main( int argc, char** argv ){
             }
 
         }
+        // print_time("[594]after updating the other edge", start, end, rank);
     }
-
+    print_time("query_send_m", start, end, rank );
+            
     // now make a trussList using the edgeList 
     vector<tuple<int,int,int>> trussList;
     for (auto it = edgeList.begin(); it!= edgeList.end(); it++){
         trussList.push_back(make_tuple(it->first.first, it->first.second, it->second.truss_number));
     }
-    
+    print_time("query_trussList_m", start, end, rank );
     for (int k = k_minimum; k <= k_maximum; k++){
         int exists = 0;
+        print_time("loop start", start, end, rank);
         for (auto it = trussList.begin(); it!= trussList.end(); it++){
             if (get<2>(*it) >= k+2){
                 exists = true;
                 break;
             }
         }
+        print_time("before allreduce", start, end, rank);
         MPI_Allreduce(MPI_IN_PLACE, &exists, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-
+        print_time("after allreduce", start, end, rank);
         if (verbose ==0 && taskid==1 ){
             if (rank == 0){
                 if (exists) output << "1 ";
@@ -640,7 +660,6 @@ int main( int argc, char** argv ){
             continue;
         }
 
-        vector<vector<int>> connectedComponents;
         // find all the edges with truss number >= k+2
         vector<pair<int,int>> trussList_k;
         for (auto it = trussList.begin(); it!= trussList.end(); it++){
@@ -649,149 +668,100 @@ int main( int argc, char** argv ){
             }
         }
 
-        vector<vector<int>> adjList(nodes.size());
-        vector<vector<pair<int, int>>> sendTrussList(size);
-        for (auto p : trussList_k){
-            adjList[p.first].push_back(p.second);
-            int other_owner = nodes[p.second].owner;
-            if (other_owner != rank){
-                sendTrussList[other_owner].push_back({p.second, p.first});
-            }
-            else{
-                adjList[p.second].push_back(p.first);
-            }
-        }
-        vector<int> sendCounts(size, 0);
-        vector<int> recvCounts(size, 0);
-        vector<int> sendOffsets(size, 0);
-        vector<int> recvOffsets(size, 0);
-        for (int i=0; i<size; i++)
-        {
-            sendCounts[i] = sendTrussList[i].size();
-        }
-        MPI_Alltoall(sendCounts.data(), 1, MPI_INT, recvCounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
-        for (int i=0; i<size; i++)
-        {
-            sendOffsets[i] = (sendOffsets[i-1] + sendCounts[i-1]);
-            recvOffsets[i] = (recvOffsets[i-1] + recvCounts[i-1]);
-        }
-        vector<pair<int, int>> sendTrussListBuffer(sendOffsets[size-1] + sendCounts[size-1]);
-        vector<pair<int, int>> recvTrussListBuffer(recvOffsets[size-1] + recvCounts[size-1]);
+        // receive the trussList_k from all other processes in the rank 0
 
-        for (int i=0; i<size; i++)
-        {
-            for (int j=0; j<sendCounts[i]; j++)
-            {
-                sendTrussListBuffer[sendOffsets[i] + j] = sendTrussList[i][j];
-            }
+        // gather the number of edges in each processor
+        int* numEdges = new int[size];
+        for(int i = 0; i < size; i ++)
+            numEdges[i] = 0;
+        int my_edges = trussList_k.size();
+        MPI_Gather(&my_edges, 1, MPI_INT, numEdges, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        // gather the edges from all the processors
+        int* recvEdgeOffsets = new int[size];
+        recvEdgeOffsets[0] = 0;
+        for (int i=1;i<size;i++){
+            recvEdgeOffsets[i] = recvEdgeOffsets[i-1] + numEdges[i-1];
+        }
+        int total_edges = recvEdgeOffsets[size-1] + numEdges[size-1];
+        pair<int,int>* recvEdges = new pair<int,int>[total_edges];
+
+        int pair_size = sizeof(pair<int,int>);
+        // now multiply by pair_size
+        for (int i=0;i<size;i++){
+            numEdges[i] *= pair_size;
+            recvEdgeOffsets[i] *= pair_size;
         }
 
-        for (int i = 0; i < size; i++)
-        {
-            sendCounts[i] *= 2;
-            recvCounts[i] *= 2;
-            sendOffsets[i] *= 2;
-            recvOffsets[i] *= 2;
+        MPI_Gatherv(trussList_k.data(), pair_size*my_edges, MPI_BYTE, recvEdges, numEdges, recvEdgeOffsets, MPI_BYTE, 0, MPI_COMM_WORLD);
+
+        // divide 
+        for (int i=0;i<size;i++){
+            numEdges[i] /= pair_size;
+            recvEdgeOffsets[i] /= pair_size;
         }
 
-
-        MPI_Alltoallv(sendTrussListBuffer.data(), sendCounts.data(), sendOffsets.data(), MPI_INT, recvTrussListBuffer.data(), recvCounts.data(), recvOffsets.data(), MPI_INT, MPI_COMM_WORLD);
-
-        for (int i=0; i<recvTrussListBuffer.size(); i++)
-        {
-            adjList[recvTrussListBuffer[i].first].push_back(recvTrussListBuffer[i].second);
-        }
-
-        // now using this trussList_k, find the connected components using bfs 
-        // and store the connected components in a vector of vectors
-        vector<int> visited(n,0);
-        for (int i=0;i<n;i++){
-            if (!visited[i]){
-                vector<int> component = print_connected_components(i, rank, size, nodes, visited, adjList);
-
-                // now gather all the components from all the processors
-                // gather the number of components in each processor
-                int* numComponents = new int[size];
-                for(int i = 0; i < size; i ++)
-                    numComponents[i] = 0;
-                int my_components = component.size();
-                MPI_Gather(&my_components, 1, MPI_INT, numComponents, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-                // gather the components from all the processors
-                int* recvComponentOffsets = new int[size];
-                recvComponentOffsets[0] = 0;
-                for (int i=1;i<size;i++){
-                    recvComponentOffsets[i] = recvComponentOffsets[i-1] + numComponents[i-1];
-                }
-
-                vector<int> recvComponents(recvComponentOffsets[size-1] + numComponents[size-1]);
-
-                MPI_Gatherv(component.data(), my_components, MPI_INT, recvComponents.data(), numComponents, recvComponentOffsets, MPI_INT, 0, MPI_COMM_WORLD);
-                if (recvComponents.size()>1) connectedComponents.push_back(recvComponents);
-                for (auto it = recvComponents.begin(); it!= recvComponents.end(); it++){
-                    visited[*it] = 1;
-                }
-                // now broadcast this visited to all processors
-                MPI_Bcast(visited.data(), n, MPI_INT, 0, MPI_COMM_WORLD);
-            }
-        }
+        // now rank 0 has all the edges in the recvEdges
+        // now do DSU on the edges and find the connected components
         if (rank ==0){
+            
+            DSU dsu(n);
+            dsu.complete_parent(recvEdges, total_edges);
+
             if (taskid ==1 && verbose==1){
-                output <<"1\n";
-                output << connectedComponents.size() << endl;
-                for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-                    sort(it->begin(), it->end());
-                    for (auto it2 = it->begin(); it2!= it->end(); it2++){
-                        output << *it2 << " ";
-                    }
-                    output << endl;
-                }
+                output << "1\n";
+                dsu.print_connected_components(output);
                 continue;
             }
-            vector<int> color(n,-1);
-            int c = 0;
-            for (auto it = connectedComponents.begin(); it!= connectedComponents.end(); it++){
-                for (auto it2 = it->begin(); it2!= it->end(); it2++){
-                    color[*it2] = c;
-                }
-                c++;
-            }
+
             vector<int> influencer_vertices;
-            set<int> components[n];
+            // cout << "n = " << n << endl;
+            
+            vector<vector<int>> to_print_components;
             for (int u = 0; u<n; u++ ){
                 // read the edges of the nodes assigned to this processor using the offsets
+                // cout << "u = " << u << endl;
+                set<int> component;
                 input.seekg(offsets[u]+8);
                 int degree = nodes[u].degree;
                 for(int j=0; j<degree; j++){
                     int neighbour;
                     input.read((char*)&neighbour, sizeof(int));
-                    if (color[neighbour]!=-1) components[u].insert(color[neighbour]);
+                    if (dsu.size[dsu.find(neighbour)]>1) component.insert(dsu.find(neighbour));
                 }
-                if ( components[u].size() >= p ) {
+                if ( component.size() >= p ) {
                     influencer_vertices.push_back(u);
+                    if (verbose ==1){
+                        vector<int> temp;
+                        for (int i=0;i<n;i++){
+                            if (component.count(dsu.find(i))){
+                                temp.push_back(i);
+                            }
+                        }
+                        to_print_components.push_back(temp);
+                    }
                 }
             }
-            assert(taskid ==2);
             output << influencer_vertices.size() << endl;
             if (verbose ==0){
                 for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
                     output << *it << " ";
                 }
-                output << endl;
+                if (influencer_vertices.size()!=0) output << endl;
             }
             else{
-                for (auto it = influencer_vertices.begin(); it!= influencer_vertices.end(); it++){
-                    output << *it << endl;
-                    for (int i=0;i<n;i++){
-                        if (components[*it].count(color[i])){
-                            output << i << " ";
-                        }
+                for (int i=0;i<to_print_components.size();i++){
+                    output << influencer_vertices[i] << "\n";
+                    for (int j=0;j<to_print_components[i].size();j++){
+                        output << to_print_components[i][j] << " ";
                     }
-                    output <<"\n";
+                    output << endl;
                 }
-            }              
+            }          
+            print_time("query_influencer_m", start, end, rank );    
         }
     }
 
     MPI_Finalize();
+    print_time("query_total_m", start_init, end, rank );
 }
