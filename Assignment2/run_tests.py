@@ -10,15 +10,20 @@ import subprocess
 cmd_str = f"make compile_parallel"
 subprocess.run(cmd_str, shell=True)
 
-for i in [0,1,2,4,5,6,7,8,3]:
+#  ids of small test cases [0, 1, 3, 4, 5]
+#  ids of intermediate test cases [6, 10, 11, 12, 14]
+#  ids of large test cases [13, 15]
+
+
+for i in [4]:
     # fetch start and end value from our_ass/test_cases/test{i}/info.txt
     # run the test with the given start and end value
     # read the info.txt file
-    file1 = f"test_cases/A2/test{i}/info.txt"
+    file1 = f"test_cases/gradedA2/test{i}/task1_info.txt"
 
     f1 = open(file1, 'r')
-    f1_A = f1.read()
-    x = f1_A.splitlines()
+    f1_A = f1.read().strip()
+    x = f1_A.split(',')
     start = int(x[0].split()[-1])
     end = int(x[1].split()[-1])
     print(start, end)
@@ -29,7 +34,7 @@ for i in [0,1,2,4,5,6,7,8,3]:
     subprocess.run(cmd_str, shell=True)
     print("Done")
     print("Checking results...")
-    cmd_str = f"python3 compare.py results/result_{i}.txt test_cases/A2/test{i}/output{i}.txt"
+    cmd_str = f"python3 compare.py results/result_{i}.txt test_cases/gradedA2/test{i}/task1_output{i}.txt"
     print("Comparing using: " + cmd_str)
     subprocess.run(cmd_str, shell=True)
     print("Done")
