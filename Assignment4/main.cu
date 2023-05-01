@@ -190,10 +190,7 @@ void write_output(SparseMatrixOutput* result, ofstream &output){
             int jj = i%result->new_n;
             output.write((char*)&ii, sizeof(int));
             output.write((char*)&jj, sizeof(int));
-            for (int j=0;j<result->m*result->m;j++){
-                int val = result->block_data[result->block_index[i]+j];
-                output.write((char*)&val, sizeof(int));
-            }
+            output.write((char*)&result->block_data[result->block_index[i]], sizeof(int)*result->m*result->m);
         }
     }
 }
@@ -223,13 +220,8 @@ __global__ void multiply(int* index1, int* index2, int* data1, int* data2, int* 
                 for (int a=0;a<m;a++){
                     for (int b=0;b<m;b++){
                         for (int c=0;c<m;c++){
-                            unsigned long long val = result_data[i*nn*mm + j*mm + a*m + b] + (unsigned long long) data1[block1_index + a*m + c]*data2[block2_index + c*m + b];
-                            if (val > 0xffffffff){
-                                result_data[i*nn*mm + j*mm + a*m + b] = 0xffffffff;
-                            }
-                            else{
-                                result_data[i*nn*mm + j*mm + a*m + b] = val;
-                            }
+                            unsigned long val = result_data[i*nn*mm + j*mm + a*m + b] + (unsigned long) data1[block1_index + a*m + c]*data2[block2_index + c*m + b];
+                            result_data[i*nn*mm + j*mm + a*m + b] = min(val,(unsigned long) 0xffffffff);
                         }
                     }
                 }
@@ -239,12 +231,12 @@ __global__ void multiply(int* index1, int* index2, int* data1, int* data2, int* 
 }
 
 void print_time(string s, chrono::high_resolution_clock::time_point& start, chrono::high_resolution_clock::time_point& end){
-    // if (s == "Total time"){
-    // end = chrono::high_resolution_clock::now();
-    // print the time duration in seconds
-    // cout << s << " " << chrono::duration_cast<chrono::nanoseconds>(end - start).count()*1e-6 << " mseconds" << endl;
-    // start = chrono::high_resolution_clock::now();
-    // }
+    if (s == "Total time"){
+    end = chrono::high_resolution_clock::now();
+    // print the time duration in mili seconds
+    cout << s << " " << chrono::duration_cast<chrono::nanoseconds>(end - start).count()*1e-6 << " mseconds" << endl;
+    start = chrono::high_resolution_clock::now();
+    }
 }
 
 
